@@ -40,6 +40,7 @@ class TestSimpleActionClient(Node):
     def __init__(self):
         super().__init__('test_simple_action_client')
         self._client = SimpleActionClient(self, Fibonacci, 'fibonacci')
+        self._client.wait_for_server()
 
         threading.Thread(target=self.interactive, daemon=True).start()
 
@@ -58,6 +59,7 @@ class TestSimpleActionClient(Node):
             print('  w:         wait until current goal terminated')
             print('  c:         cancel current goal')
             print('  q:         quit')
+
             key = input('>> ')
             if is_int(key):
                 self._client.send_goal(Fibonacci.Goal(order=int(key)),

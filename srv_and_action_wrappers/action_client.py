@@ -116,7 +116,13 @@ class ActionClient(object):
         return ActionClient._GoalStatus[status]
 
     def wait_for_server(self, timeout_sec=None):
-        return self._client.wait_for_server(timeout_sec)
+        if not self._client.wait_for_server(timeout_sec):
+            self._logger.error('timeout[%fsec] expired before connection to action server[%s] establised'
+                               % (timeout_sec, self._client._action_name))
+            return False
+        self._logger.info('connection to action server[%s] established'
+                          % self._client._action_name)
+        return True
 
     def send_goal(self, goal, feedback_callback=None, timeout_sec=None):
         goal_handle      = None
@@ -154,7 +160,7 @@ class SimpleActionClient(ActionClient):
                   timeout_sec=None, goal_handle_timeout_sec=None):
         self._goal_handle = super().send_goal(goal, feedback_callback,
                                               goal_handle_timeout_sec)
-        if not self._goal_handle or timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             return
         return self.wait(timeout_sec)
 

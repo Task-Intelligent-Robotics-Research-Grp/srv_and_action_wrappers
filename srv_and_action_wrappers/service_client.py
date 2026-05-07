@@ -37,18 +37,24 @@ import rclpy, threading
 #  class ServiceClient                                               #
 ######################################################################
 class ServiceClient(object):
-    def __init__(self, node, service_type, service_name, callback_group=None):
+    def __init__(self, node, srv_type, srv_name, callback_group=None):
         super().__init__()
 
         self._logger        = node.get_logger()
         self._response      = None
         self._response_cond = threading.Condition()
-        self._client        = node.create_client(service_type, service_name,
+        self._client        = node.create_client(srv_type, srv_name,
                                                  callback_group=callback_group)
-        self._logger.info('service client[%s] started' % service_name)
+        self._logger.info('service client[%s] started' % srv_name)
 
     def wait_for_server(self, timeout_sec=None):
-        return self._client.wait_for_server(timeout_sec)
+        if not self._client.wait_for_server(timeout_sec):
+            self._logger.error('timeout[%fsec] expired before connection to service[%s] establised'
+                               % (timeout_sec, self._client.srv_name))
+            return False
+        self._logger.info('connection to service[%s] established'
+                          % self._client.srv_name)
+        return True
 
     def call(self, request, timeout_sec=None):
         def _response_cb(future):
@@ -58,7 +64,7 @@ class ServiceClient(object):
 
         self._response = None
         self._client.call_async(request).add_done_callback(_response_cb)
-        if timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             return
         return self.wait(timeout_sec)
 
