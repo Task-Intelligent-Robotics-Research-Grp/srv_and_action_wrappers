@@ -105,7 +105,7 @@ class ServerGoalHandlesDict(object):
 #  class ActionServer  #
 ########################
 class ActionServer(object):
-    def __init__(self, node, action_type, action_name, user_execute_callback,
+    def __init__(self, node, action_type, action_name, execute_callback,
                  check_goal_request=None, callback_group=None,
                  goal_processing_policy='single', grouping=False):
         super().__init__()
@@ -131,7 +131,7 @@ class ActionServer(object):
         else:
             self._goal_handles = ServerGoalHandlePassthrough()
 
-        self._user_execute_cb = user_execute_callback
+        self._user_execute_cb = execute_callback
         self._server = rclpy.action.server.ActionServer(
                            node, action_type, action_name,
                            callback_group=callback_group,

@@ -47,11 +47,11 @@ class TestActionServer(Node):
         policy   = self.declare_parameter('policy', 'single').value
         grouping = self.declare_parameter('grouping', False).value
         self._server = ActionServer(self, Fibonacci, 'fibonacci',
-                                    self._user_execute_cb, None,
+                                    self._execute_cb, None,
                                     MutuallyExclusiveCallbackGroup(),
                                     policy, grouping)
 
-    def _user_execute_cb(self, goal_handle):
+    def _execute_cb(self, goal_handle):
         feedback = Fibonacci.Feedback(sequence=[0, 1])
 
         # Start executing the action
