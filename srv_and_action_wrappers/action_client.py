@@ -62,6 +62,13 @@ class ClientGoalHandle(object):
     def status(self):
         return self._goal_handle.status
 
+    @property
+    def goal_id_str(self):
+        s = '0x'
+        for i in self.goal_id.uuid:
+            s += format(i, '02x')
+        return s
+
     def wait(self, timeout_sec=None):
         def _result_cb(future):
             with self._result_cond:

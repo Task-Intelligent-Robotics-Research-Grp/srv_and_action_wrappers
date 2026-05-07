@@ -142,7 +142,7 @@ class ActionServer(object):
         self._logger.info('action server[%s] started' % action_name)
 
     @staticmethod
-    def goal_uuid_str(goal_handle):
+    def goal_id_str(goal_handle):
         s = '0x'
         for i in goal_handle.goal_id.uuid:
             s += format(i, '02x')
@@ -163,26 +163,26 @@ class ActionServer(object):
 
     def _cancel_cb(self, goal_handle):
         self._logger.warn('cancel request for goal[%s] received'
-                          % ActionServer.goal_uuid_str(goal_handle))
+                          % ActionServer.goal_id_str(goal_handle))
         return CancelResponse.ACCEPT
 
     def _execute_cb(self, goal_handle):
         self._logger.info('goal[%s] started'
-                          % ActionServer.goal_uuid_str(goal_handle))
+                          % ActionServer.goal_id_str(goal_handle))
         try:
             return self._user_execute_cb(goal_handle)
         finally:
             self._goal_handles.remove(goal_handle)
             if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:
                 self._logger.info('goal[%s] SUCCEEDED'
-                                  % ActionServer.goal_uuid_str(goal_handle))
+                                  % ActionServer.goal_id_str(goal_handle))
             elif goal_handle.status == GoalStatus.STATUS_CANCELED:
                 self._logger.warn('goal[%s] CANCELED'
-                                  % ActionServer.goal_uuid_str(goal_handle))
+                                  % ActionServer.goal_id_str(goal_handle))
             elif goal_handle.status == GoalStatus.STATUS_ABORTED:
                 self._logger.error('goal[%s] ABORTED'
-                                   % ActionServer.goal_uuid_str(goal_handle))
+                                   % ActionServer.goal_id_str(goal_handle))
             else:
                 self._logger.error('goal[%s] terminated with status[%d]'
-                                   % (ActionServer.goal_uuid_str(goal_handle),
+                                   % (ActionServer.goal_id_str(goal_handle),
                                       goal_handle.status))
