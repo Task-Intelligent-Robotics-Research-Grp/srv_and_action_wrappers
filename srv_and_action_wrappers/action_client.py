@@ -36,7 +36,7 @@ from action_msgs.msg import GoalStatus
 from action_msgs.srv import CancelGoal
 
 ######################################################################
-#  class ClientGoalHandleWrapper                                     #
+#  class ClientGoalHandle                                            #
 ######################################################################
 class ClientGoalHandle(object):
     def __init__(self, goal_handle):
@@ -93,13 +93,13 @@ class ClientGoalHandle(object):
 ######################################################################
 class ActionClient(object):
     _GoalStatus = [
-        'STATUS_UNKNOWN',
-        'ERROR_REJECTED',         # cancel request rejected
-        'ERROR_UNKNOWN_GOAL_ID',  # cancel request to goal with unkown ID
-        'ERROR_GOAL_TERMINATED',  # cancel request to goal already terminated
-        'SUCCEEDED',              # goal succeeded
-        'CANCELED',               # goal canceled
-        'ABORTED',                # goal aborted
+        'STATUS_UNKNOWN',        # 0: GoalStatus.STATUS_UNKNOWN
+        'ERROR_REJECTED',        # 1: CancelGoal.Response.ERROR_REJECTED
+        'ERROR_UNKNOWN_GOAL_ID', # 2: CancelGoal.Response.ERROR_UNKNOWN_GOAL_ID
+        'ERROR_GOAL_TERMINATED', # 3: CancelGoal.Response.ERROR_GOAL_TERMINATED
+        'STATUS_SUCCEEDED',      # 4: GoalStatus.STATUS_SUCCEEDED
+        'STATUS_CANCELED',       # 5: GoalStatus.STATUS_CANCELED
+        'STATUS_ABORTED',        # 6: GoalStatus.STATUS_ABORTED
     ]
 
     def __init__(self, node, action_type, action_name, callback_group=None):
@@ -163,6 +163,11 @@ class SimpleActionClient(ActionClient):
         if timeout_sec is not None and timeout_sec <= 0.0:
             return
         return self.wait(timeout_sec)
+
+    @property
+    def status(self):
+        return self._goal_handle.status if self._goal_handle else \
+               GoalStatus.STATUS_UNKNOWN
 
     def wait(self, timeout_sec=None):
         if not self._goal_handle:
