@@ -81,7 +81,7 @@ class ClientGoalHandle(object):
                 if not self._result_cond.wait_for(lambda:
                                                   self._result is not None,
                                                   timeout_sec):
-                    self._result = (GoalStatus.STATUS_UNKNOWN, None)
+                    return (self.status, None)
         return self._result
 
     def cancel(self):
@@ -89,7 +89,7 @@ class ClientGoalHandle(object):
             cancel_response = future.result()
             if cancel_response.return_code != CancelGoal.Response.ERROR_NONE:
                 with self._result_cond:
-                    self._result = (cancel_response.return_code, None)
+                    self._result = (self.status, None)
                     self._result_cond.notify_all()
 
         self._goal_handle.cancel_goal_async() \
@@ -100,13 +100,13 @@ class ClientGoalHandle(object):
 ######################################################################
 class ActionClient(object):
     _GoalStatus = [
-        'STATUS_UNKNOWN',        # 0: GoalStatus.STATUS_UNKNOWN
-        'ERROR_REJECTED',        # 1: CancelGoal.Response.ERROR_REJECTED
-        'ERROR_UNKNOWN_GOAL_ID', # 2: CancelGoal.Response.ERROR_UNKNOWN_GOAL_ID
-        'ERROR_GOAL_TERMINATED', # 3: CancelGoal.Response.ERROR_GOAL_TERMINATED
-        'STATUS_SUCCEEDED',      # 4: GoalStatus.STATUS_SUCCEEDED
-        'STATUS_CANCELED',       # 5: GoalStatus.STATUS_CANCELED
-        'STATUS_ABORTED',        # 6: GoalStatus.STATUS_ABORTED
+        'UNKNOWN',    # 0: GoalStatus.STATUS_UNKNOWN
+        'ACCEPTED',   # 1: GoalStatus.STATUS_ACCEPTED
+        'EXECUTING',  # 2: CancelGoal.STATUS_EXECUTING
+        'CANCELING',  # 3: CancelGoal.STATUS_CANCELING
+        'SUCCEEDED',  # 4: GoalStatus.STATUS_SUCCEEDED
+        'CANCELED',   # 5: GoalStatus.STATUS_CANCELED
+        'ABORTED',    # 6: GoalStatus.STATUS_ABORTED
     ]
 
     def __init__(self, node, action_type, action_name, callback_group=None):
@@ -117,6 +117,10 @@ class ActionClient(object):
                            node, action_type, action_name,
                            callback_group=callback_group)
         self._logger.info('action client[%s] started' % action_name)
+
+    @property
+    def logger(self):
+        return self._logger
 
     @staticmethod
     def goal_status_str(status):
@@ -167,18 +171,16 @@ class SimpleActionClient(ActionClient):
                   timeout_sec=None, goal_handle_timeout_sec=None):
         self._goal_handle = super().send_goal(goal, feedback_callback,
                                               goal_handle_timeout_sec)
-        if timeout_sec is not None and timeout_sec <= 0.0:
-            return
         return self.wait(timeout_sec)
 
     @property
     def status(self):
-        return self._goal_handle.status if self._goal_handle else \
+        return self._goal_handle.status if self._goal_handle is not None else \
                GoalStatus.STATUS_UNKNOWN
 
     def wait(self, timeout_sec=None):
         if not self._goal_handle:
-            self._logger.error('no goals awaited')
+            self.logger.error('no goals awaited')
             return (GoalStatus.STATUS_UNKNOWN, None)
         return self._goal_handle.wait(timeout_sec)
 
