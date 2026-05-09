@@ -64,7 +64,7 @@ class ServerGoalHandleBuffer(object):
             self._goal_handle = None
 
 class ServerGoalHandleQueue(object):
-    """FIFO queue storing ``ServerGoalHandle``s.
+    """FIFO queue storing ``ServerGoalHandle``.
     """
     def __init__(self):
         super().__init__()

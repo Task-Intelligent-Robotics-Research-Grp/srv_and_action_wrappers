@@ -124,9 +124,9 @@ class ClientGoalHandle(object):
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
 
-######################################################################
-#  class ActionClient                                                #
-######################################################################
+#*********************************************************************
+#  class ActionClient                                                *
+#*********************************************************************
 class ActionClient(object):
     """ROS Action client synchronously awaiting goal handle.
 
