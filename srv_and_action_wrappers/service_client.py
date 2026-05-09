@@ -33,11 +33,30 @@
 #
 import rclpy, threading
 
-######################################################################
-#  class ServiceClient                                               #
-######################################################################
+from rclpy.node            import Node
+from typing                import Optional
+from rclpy.callback_groups import CallbackGroup
+#from rclpy.type_support    import Srv, SrvRequestT, SrvResponseT
+
+#************************************************************************
+#  class ServiceClient                                                  *
+#************************************************************************
 class ServiceClient(object):
-    def __init__(self, node, srv_type, srv_name, callback_group=None):
+    """ROS service client with a method awaiting response from the server.
+    """
+    def __init__(self,
+                 node: Node,
+                 srv_type,
+                 srv_name: str,
+                 callback_group: Optional[CallbackGroup]=None):
+        """Create a new service client.
+
+        :param node: The ROS node to add the service client to.
+        :param srv_type: The service type.
+        :param srv_name: The name of the service.
+        :param callback_group: The callback group for the service client.
+            If ``None``, then the default callback group for the node is used.
+        """
         super().__init__()
 
         self._logger        = node.get_logger()
@@ -47,8 +66,16 @@ class ServiceClient(object):
                                                  callback_group=callback_group)
         self._logger.info('service client[%s] started' % srv_name)
 
-    def wait_for_server(self, timeout_sec=None):
-        if not self._client.wait_for_server(timeout_sec):
+    def wait_for_service(self, timeout_sec: Optional[float]=None) -> bool:
+        """Wait for a service server to become ready.
+
+        Returns as soon as a server becomes ready or if the timeout expires.
+
+        :param timeout_sec: Seconds to wait. If ``None``, then wait forever.
+        :return: ``True`` if server became ready while waiting
+            or ``False`` on a timeout.
+        """
+        if not self._client.wait_for_service(timeout_sec):
             self._logger.error('timeout[%fsec] expired before connection to service[%s] establised'
                                % (timeout_sec, self._client.srv_name))
             return False
@@ -56,7 +83,19 @@ class ServiceClient(object):
                           % self._client.srv_name)
         return True
 
-    def call(self, request, timeout_sec=None):
+    def call(self, request, timeout_sec: Optional[float]=None):
+        """Make a synchronous or asynchronous service request.
+
+        If zero or negative ``timeout_sec`` value is specified, the response
+        to the request should be obtaied by calling ``wait()``.
+
+        :param request: The service request.
+        :param timeout_sec: If positive, seconds to wait. If ``None``,
+            then wait forever. Return immediately otherwise,
+            i.e. asynchronous request.
+        :return: The service response if ``timeout_sec`` is positive
+            or ``None``. Returns ``None`` otherwise.
+        """
         def _response_cb(future):
             with self._response_cond:
                 self._response = future.result().response
@@ -68,11 +107,20 @@ class ServiceClient(object):
             return
         return self.wait(timeout_sec)
 
-    def wait(timeout_sec=None):
+    def wait(self, timeout_sec: Optional[float]=None):
+        """Wait for the response to the service request.
+
+        Wait until the response to the request issued by `call()` with
+        non-positive ``timeout_sec`` value becomes available.
+
+        :param timeout_sec: Seconds to wait. If ``None``, then wait forever.
+            Raise ``TimeoutError`` on a timeout.
+        :return: The service response.
+        """
         with self._response_cond:
             if not self._response_cond.wait_for(lambda:
                                                 self._response is not None,
                                                 timeout_sec):
                 self._logger.error('timeout[%fsec] has expired' % timeout_sec)
-                return
+                raise TimeoutError()
             return self._response

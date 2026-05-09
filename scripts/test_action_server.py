@@ -47,8 +47,8 @@ class TestActionServer(Node):
         policy   = self.declare_parameter('policy', 'single').value
         grouping = self.declare_parameter('grouping', False).value
         self._server = ActionServer(self, Fibonacci, 'fibonacci',
-                                    self._execute_cb, None,
-                                    MutuallyExclusiveCallbackGroup(),
+                                    self._execute_cb,
+                                    MutuallyExclusiveCallbackGroup(), None,
                                     policy, grouping)
 
     def _execute_cb(self, goal_handle):

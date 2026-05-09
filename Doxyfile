@@ -1,0 +1,39 @@
+# Doxyfile configuration file
+
+# Set the project name
+PROJECT_NAME           = srv_and_action_wrappers
+
+INPUT_FILTER           = /usr/local/bin/doxyfilter_python.py
+
+# Set the output directory for the generated documentation
+OUTPUT_DIRECTORY       = docs
+<!-- USE_MDFILE_AS_MAINPAGE = ./README.md
+Input                  = ./README.md -->
+
+
+FULL_PATH_NAMES        = NO
+
+EXTRACT_ALL            = YES
+
+EXTRACT_PRIVATE        = NO
+
+EXTRACT_STATIC         = YES
+
+EXTRACT_ANON_NSPACES   = NO
+
+RECURSIVE              = YES
+
+EXCLUDE                = scripts launch setup.py
+
+SOURCE_BROWSER         = YES
+
+REFERENCED_BY_RELATION = NO
+
+REFERENCES_RELATION    = NO
+
+
+GENERATE_LATEX         = NO
+
+CALL_GRAPH             = NO
+
+CALLER_GRAPH           = NO

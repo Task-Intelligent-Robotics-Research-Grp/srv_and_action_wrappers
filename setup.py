@@ -20,8 +20,8 @@ setup(
     tests_require=["pytest"],
     entry_points={
         'console_scripts': [
-            'test_simple_action_client = ' + package_name + '.test_simple_action_client:main',
-            'test_action_server = ' + package_name + '.test_action_server:main',
+            'test_simple_action_client = scripts.test_simple_action_client:main',
+            'test_action_server = scripts.test_action_server:main',
         ],
     },
 )
