@@ -27,14 +27,14 @@ def declare_launch_arguments(args):
 
 def launch_setup(context):
     return [
-        Node(package='srv_and_action_wrappers',
+        Node(package='task_wrappers',
              executable='test_action_server',
              parameters=[
                  {'policy':   LaunchConfiguration('policy'),
                   'grouping': LaunchConfiguration('grouping')}
              ],
              output='screen'),
-        Node(package='srv_and_action_wrappers',
+        Node(package='task_wrappers',
              executable='test_simple_action_client',
              prefix=['xterm -fn 7x14 -e'],
              output='screen'),

@@ -32,9 +32,9 @@
 #  Author: Toshio Ueshiba (t.ueshiba@aist.go.jp)
 #
 import rclpy, sys, threading
-from rclpy.node                            import Node
-from example_interfaces.action             import Fibonacci
-from srv_and_action_wrappers.action_client import SimpleActionClient
+from rclpy.node                  import Node
+from example_interfaces.action   import Fibonacci
+from task_wrappers.action_client import SimpleActionClient
 
 class TestSimpleActionClient(Node):
     def __init__(self):

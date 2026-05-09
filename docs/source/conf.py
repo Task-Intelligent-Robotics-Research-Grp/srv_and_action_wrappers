@@ -8,7 +8,7 @@
 import os, sys
 sys.path.insert(0, os.path.abspath('../..'))
 
-project = 'srv_and_action_wrappers'
+project = 'task_wrappers'
 copyright = '2026, Toshio Ueshiba'
 author = 'Toshio Ueshiba'
 release = '0.1.0'

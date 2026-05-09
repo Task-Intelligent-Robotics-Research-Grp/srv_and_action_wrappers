@@ -1,7 +1,7 @@
-srv_and_action_wrappers
+task_wrappers
 =======================
 
 .. toctree::
    :maxdepth: 4
 
-   srv_and_action_wrappers
+   task_wrappers

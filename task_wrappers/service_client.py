@@ -87,13 +87,18 @@ class ServiceClient(object):
         """Make a synchronous or asynchronous service request.
 
         If zero or negative ``timeout_sec`` value is specified, the response
-        to the request should be obtaied by calling ``wait()``.
+        to the request should be obtaied by calling `wait()`.
 
         :param request: The service request.
-        :param timeout_sec: If positive, seconds to wait. If ``None``,
-            then wait forever. Return immediately otherwise,
-            i.e. asynchronous request.
-        :return: The service response if ``timeout_sec`` is positive
+        :param timeout_sec:
+          - Seconds to wait for response, if positive.
+          - Wait forever, if ``None``.
+          - Return immediately, i.e. asynchronous request, if non-positive.
+        :return:
+          - Goal handle, if the request is accepted within ``timeout_sec``.
+          - ``None``,  if the request is rejected.
+          - Raise ``TimeoutError`` on a timeout.
+          - The service response, if ``timeout_sec`` is positive
             or ``None``. Returns ``None`` otherwise.
         """
         def _response_cb(future):
@@ -113,9 +118,14 @@ class ServiceClient(object):
         Wait until the response to the request issued by `call()` with
         non-positive ``timeout_sec`` value becomes available.
 
-        :param timeout_sec: Seconds to wait. If ``None``, then wait forever.
-            Raise ``TimeoutError`` on a timeout.
-        :return: The service response.
+        :param timeout_sec:
+          - Seconds to wait for the response, if positive.
+          - Wait forever, if ``None``.
+          - Raise ``TimeoutError``, if non-positive.
+        :return:
+          - Service response, if the response becomes available within
+            ``timeout_sec``.
+          - Raise ``TimeoutError`` on a timeout.
         """
         with self._response_cond:
             if not self._response_cond.wait_for(lambda:

@@ -1,7 +1,7 @@
 # Doxyfile configuration file
 
 # Set the project name
-PROJECT_NAME           = srv_and_action_wrappers
+PROJECT_NAME           = task_wrappers
 
 INPUT_FILTER           = /usr/local/bin/doxyfilter_python.py
 

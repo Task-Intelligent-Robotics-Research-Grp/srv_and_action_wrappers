@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 from glob import glob
 
-package_name = "srv_and_action_wrappers"
+package_name = "task_wrappers"
 
 setup(
     name=package_name,

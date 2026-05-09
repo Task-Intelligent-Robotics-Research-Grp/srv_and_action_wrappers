@@ -32,13 +32,13 @@
 #  Author: Toshio Ueshiba (t.ueshiba@aist.go.jp)
 #
 import rclpy, sys, time
-from rclpy.node                import Node
-from rclpy.executors           import MultiThreadedExecutor
-from rclpy.callback_groups     import (MutuallyExclusiveCallbackGroup,
-                                       ReentrantCallbackGroup)
-from rclpy.action.server       import GoalResponse, CancelResponse
-from example_interfaces.action import Fibonacci
-from srv_and_action_wrappers.action_server import ActionServer
+from rclpy.node                  import Node
+from rclpy.executors             import MultiThreadedExecutor
+from rclpy.callback_groups       import (MutuallyExclusiveCallbackGroup,
+                                         ReentrantCallbackGroup)
+from rclpy.action.server         import GoalResponse, CancelResponse
+from example_interfaces.action   import Fibonacci
+from task_wrappers.action_server import ActionServer
 
 class TestActionServer(Node):
     def __init__(self):

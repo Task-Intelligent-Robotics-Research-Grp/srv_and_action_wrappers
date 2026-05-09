@@ -152,6 +152,7 @@ class ActionServer(object):
               FIFO queue. Its processing will be deferred until all the
               preceeding goals are completed.
             - If 'multi', then the server processes multiple goals in parallel.
+            - Otherwise, raises ``ValueError``.
         :param grouping: Enables/Disables grouping of incoming goals
             by a field named `group_name` in the goal request. This parameter
             has no effect when `goal_processing_policy` is 'multi'.
@@ -178,8 +179,10 @@ class ActionServer(object):
                     = ServerGoalHandlesDict(ServerGoalHandleQueue)
             else:
                 self._goal_handles = ServerGoalHandleQueue()
-        else:
+        elif goal_processing_policy == 'multi':
             self._goal_handles = ServerGoalHandlePassthrough()
+        else:
+            raise ValueError()
 
         self._user_execute_cb = execute_callback
         if not goal_callback:

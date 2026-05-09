@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>srv_and_action_wrappers</name>
+  <name>task_wrappers</name>
   <version>0.0.0</version>
-  <description>The srv_and_action_wrappers package</description>
+  <description>The task_wrappers package</description>
 
   <maintainer email="t.ueshiba@aist.go.jp">Toshio UESHIBA</maintainer>
 
