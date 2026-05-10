@@ -321,9 +321,9 @@ class SimpleActionClient(ActionClient):
         self._goal_handle.cancel()
 
 #*********************************************************************
-#  class SimpleActionGroupClient                                     *
+#  class GroupedSimpleActionClient                                   *
 #*********************************************************************
-class SimpleActionGroupClient(ActionClient):
+class GroupedSimpleActionClient(ActionClient):
     """ ROS Action client that tracks only one goal for each group at a time.
     """
     def __init__(self, node, action_type, action_name, callback_group=None):
