@@ -281,6 +281,8 @@ class SimpleActionClient(ActionClient):
         """
         self._goal_handle = super().send_goal(goal, feedback_callback,
                                               goal_handle_timeout_sec)
+        if timeout_sec is not None and timeout_sec <= 0.0:
+            return (self.status, None)
         return self.wait(timeout_sec)
 
     @property
@@ -358,6 +360,8 @@ class SimpleActionGroupClient(ActionClient):
         self._goal_handles[goal.group_name] \
             = super().send_goal(goal, feedback_callback,
                                 goal_handle_timeout_sec)
+        if timeout_sec is not None and timeout_sec <= 0.0:
+            return (self.status(goal.group_name), None)
         return self.wait(goal.group_name, timeout_sec)
 
     def status(self, group_name: str) -> int:
