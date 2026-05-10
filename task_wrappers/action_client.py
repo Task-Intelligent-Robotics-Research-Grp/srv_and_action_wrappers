@@ -89,16 +89,19 @@ class ClientGoalHandle(object):
         `ActionClient.send_goal()` or cancel request issued by `cancel()`
         becomes available.
 
-        :param timeout_sec:
+        :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait, if positive.
           - Wait forever, if ``None``.
-          - Return immediately without waiting, if zero or negative.
+          - Raise ``ValueError``, if zero or negative.
         :return:
           - A tuple of the goal status and the action result,
             if the result becomes available within ``timeout_sec``.
           - A tuple of the current (non-terminal) goal state
             and ``None``, otherwise.
         """
+        if timeout_sec is not None and timeout_sec <= 0.0:
+            raise ValueError()
+
         def _result_cb(future):
             with self._result_cond:
                 self._result = (future.result().status, future.result().result)
@@ -191,7 +194,7 @@ class ActionClient(object):
         return True
 
     def send_goal(self, goal, feedback_callback=None,
-                  timeout_sec: Optional[float]=None):
+                  goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait until the corresponding
         goal handle will be returned.
 
@@ -201,15 +204,19 @@ class ActionClient(object):
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
             with the goal.
-        :param timeout_sec:
+        :param goal_handle_timeout_sec: Timeout time waiting for the goal
+          handle in seconds.
           - Seconds to wait for the goal handle, if positive.
           - Wait forever, if ``None``.
-          - Raise ``TimeoutError``, if non-positive.
+          - Raise ``ValueError``, if zero or negative.
         :return:
           - Goal handle, if the request is accepted within ``timeout_sec``.
           - ``None``,  if the request is rejected.
           - Raise ``TimeoutError`` on a timeout.
         """
+        if goal_handle_timeout_sec and goal_handle_timeout_sec <= 0.0:
+            raise ValueError()
+
         goal_handle      = None
         goal_handle_cond = threading.Condition()
 
@@ -224,8 +231,9 @@ class ActionClient(object):
                     .add_done_callback(_goal_response_cb)
         with goal_handle_cond:
             if not goal_handle_cond.wait_for(lambda: goal_handle is not None,
-                                             timeout_sec):
-                self._logger.error('timeout[%fsec] has expired' % timeout_sec)
+                                             goal_handle_timeout_sec):
+                self._logger.error('timeout[%fsec] has expired'
+                                   % goal_handle_timeout_sec)
                 raise TimeoutError()
             elif not goal_handle.accepted:
                 self._logger.error('goal REJECTED')
@@ -259,16 +267,20 @@ class SimpleActionClient(ActionClient):
         """Send a goal request to the server and wait for the result.
 
         After sending request, wait for the goal handle first. Then,
-        if the goal is accepted, wait for its result.
+        if the goal is accepted, wait for its result. If zero or negative
+        timeout time is specified, the call returns immediately after
+        the goal handle becomes available, that is, asynchronous call.
+        In this case, the result should be obtained by calling 'wait()'.
 
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
             with the goal.
-        :param timeout_sec:
+        :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait for result, if positive.
           - Wait forever, if ``None``.
           - Return immediately, i.e. asynchronous request, if zero or negative.
-        :param goal_handle_timeout_sec:
+        :param goal_handle_timeout_sec: Timeout time waiting for the goal
+          handle in seconds.
           - Seconds to wait for goal handle, if positive.
           - Wait forever, if ``None``.
           - Raise ``TimeoutError`` on a timeout or if non-positive.
@@ -296,16 +308,18 @@ class SimpleActionClient(ActionClient):
         Wait until the result of the goal request issued by `send_goal()`
         or cancel request issued by `cancel()` becomes available.
 
-        :param timeout_sec:
+        :param timeout_sec: Timeout time in seconds.
           - Seconds to wait, if positive.
           - Wait forever, if ``None``.
-          - Return immediately without waiting, if zero or negative.
+          - Raise ``ValueError``, if zero or negative.
         :return:
           - A tuple of the goal status and the action result,
             if the result becomes available within ``timeout_sec``.
           - A tuple of the current (non-terminal) goal state
             and ``None``. otherwise.
         """
+        if timeout_sec is not None and timeout_sec <= 0.0:
+            raise ValueError()
         if not self._goal_handle:
             self.logger.error('no goals awaited')
             return (GoalStatus.STATUS_UNKNOWN, None)
@@ -337,16 +351,20 @@ class GroupedSimpleActionClient(ActionClient):
         """Send a goal request to the server and wait for the result.
 
         After sending request, wait for the goal handle first. Then,
-        if the goal is accepted, wait for its result.
+        if the goal is accepted, wait for its result. If zero or negative
+        timeout time is specified, the call returns immediately after
+        the goal handle becomes available, that is, asynchronous call.
+        In this case, the result should be obtained by calling 'wait()'.
 
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
             with the goal.
-        :param timeout_sec:
+        :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait for result, if positive.
           - Wait forever, if ``None``.
           - Return immediately, i.e. asynchronous request, if zero or negative.
-        :param goal_handle_timeout_sec:
+        :param goal_handle_timeout_sec: Timeout time waiting for the goal
+            handle in seconds.
           - Seconds to wait for goal handle, if positive
           - Wait forever, if ``None``.
           - Raise ``TimeoutError`` on a timeout or if non-positive.
@@ -375,16 +393,18 @@ class GroupedSimpleActionClient(ActionClient):
         or cancel request issued by `cancel()` becomes available.
 
         :param group_name: Group name of the goal to be waited for.
-        :param timeout_sec:
+        :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait, if positive.
           - Wait forever, if ``None``.
-          - Return immediately without waiting, if zero or negative.
+        - Raise ``ValueError``, if zero or negative.
         :return:
           - A tuple of the goal status and the action result,
             if the result becomes available within ``timeout_sec``.
           - A tuple of the current (non-terminal) goal state
             and ``None``. otherwise.
         """
+        if timeout_sec is not None and timeout_sec <= 0.0:
+            raise ValueError()
         goal_handle = self._goal_handles.get(group_name)
         if not goal_handle:
             self.logger.error('no goals awaited')

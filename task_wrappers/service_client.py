@@ -90,7 +90,7 @@ class ServiceClient(object):
         to the request should be obtaied by calling `wait()`.
 
         :param request: The service request.
-        :param timeout_sec:
+        :param timeout_sec: Timeout time in seconds.
           - Seconds to wait for response, if positive.
           - Wait forever, if ``None``.
           - Return immediately, i.e. asynchronous request, if non-positive.
@@ -118,7 +118,7 @@ class ServiceClient(object):
         Wait until the response to the request issued by `call()` with
         non-positive ``timeout_sec`` value becomes available.
 
-        :param timeout_sec:
+        :param timeout_sec: Timeout time in seconds.
           - Seconds to wait for the response, if positive.
           - Wait forever, if ``None``.
           - Raise ``TimeoutError``, if non-positive.
