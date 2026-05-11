@@ -124,7 +124,7 @@ class ActionServer(object):
     This class wraps ``rclpy.action.server.ActionServer``.
     """
     def __init__(self, node: Node, action_type, action_name: str,
-                 execute_callback,
+                 execute_callback, *,
                  callback_group: Optional[CallbackGroup]=None,
                  goal_callback=None,
                  goal_processing_policy: str='single',

@@ -48,6 +48,7 @@ class ServiceClient(object):
                  node: Node,
                  srv_type,
                  srv_name: str,
+                 *,
                  callback_group: Optional[CallbackGroup]=None):
         """Create a new service client.
 
@@ -83,7 +84,7 @@ class ServiceClient(object):
                           % self._client.srv_name)
         return True
 
-    def call(self, request, timeout_sec: Optional[float]=None):
+    def call(self, request, *, timeout_sec: Optional[float]=None):
         """Make a synchronous or asynchronous service request.
 
         If zero or negative ``timeout_sec`` value is specified, the response
@@ -93,13 +94,10 @@ class ServiceClient(object):
         :param timeout_sec: Timeout time in seconds.
           - Seconds to wait for response, if positive.
           - Wait forever, if ``None``.
-          - Return immediately, i.e. asynchronous request, if non-positive.
+          - Return immediately, i.e. asynchronous request, if zero or negative.
         :return:
-          - Goal handle, if the request is accepted within ``timeout_sec``.
-          - ``None``,  if the request is rejected.
+          - Service response, if it becomes available within ``timeout_sec``.
           - Raise ``TimeoutError`` on a timeout.
-          - The service response, if ``timeout_sec`` is positive
-            or ``None``. Returns ``None`` otherwise.
         """
         def _response_cb(future):
             with self._response_cond:
@@ -108,23 +106,22 @@ class ServiceClient(object):
 
         self._response = None
         self._client.call_async(request).add_done_callback(_response_cb)
-        if timeout_sec is not None and timeout_sec <= 0.0:
+        if timeout_sec and timeout_sec <= 0.0:
             return
-        return self.wait(timeout_sec)
+        return self.wait(timeout_sec=timeout_sec)
 
-    def wait(self, timeout_sec: Optional[float]=None):
-        """Wait for the response to the service request.
+    def wait(self, *, timeout_sec: Optional[float]=None):
+        """Wait for a response to the service request.
 
-        Wait until the response to the request issued by `call()` with
+        Wait until a response to the request issued by `call()` with
         non-positive ``timeout_sec`` value becomes available.
 
         :param timeout_sec: Timeout time in seconds.
           - Seconds to wait for the response, if positive.
           - Wait forever, if ``None``.
-          - Raise ``TimeoutError``, if non-positive.
+          - Raise ``TimeoutError``, if zero or negative.
         :return:
-          - Service response, if the response becomes available within
-            ``timeout_sec``.
+          - Service response, if it becomes available within ``timeout_sec``.
           - Raise ``TimeoutError`` on a timeout.
         """
         with self._response_cond:

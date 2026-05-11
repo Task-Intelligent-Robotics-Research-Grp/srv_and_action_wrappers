@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+#
 #  BSD 3-Clause License
 #
 #  Copyright (c) 2026, National Institute of Advanced Industrial Science
@@ -48,8 +50,8 @@ class TestActionServer(Node):
         grouping = self.declare_parameter('grouping', False).value
         self._server = ActionServer(self, Fibonacci, 'fibonacci',
                                     self._execute_cb,
-                                    MutuallyExclusiveCallbackGroup(), None,
-                                    policy, grouping)
+                                    goal_processing_policy=policy,
+                                    grouping=grouping)
 
     def _execute_cb(self, goal_handle):
         feedback = Fibonacci.Feedback(sequence=[0, 1])

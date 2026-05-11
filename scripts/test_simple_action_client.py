@@ -71,7 +71,7 @@ class TestSimpleActionClient(Node):
                       % (SimpleActionClient.goal_status_str(status),
                          list(result.sequence) if result else 'None'))
             elif key == 'c':
-                self._client.cancel()
+                self._client.cancel_goal()
             elif key == 'q':
                 break
 
