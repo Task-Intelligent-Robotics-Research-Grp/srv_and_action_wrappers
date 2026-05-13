@@ -99,7 +99,7 @@ class ClientGoalHandle(object):
           - A tuple of the current (non-terminal) goal state
             and ``None``, otherwise.
         """
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
 
         def _result_cb(future):
@@ -299,7 +299,7 @@ class SimpleActionClient(ActionClient):
             return GoalStatus.STATUS_UNKNOWN, None  # goal REJECTED
 
         self._goal_handle = goal_handle             # goal ACCEPTED
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             return self.status, None
 
         return self.wait(timeout_sec=timeout_sec)
@@ -325,7 +325,7 @@ class SimpleActionClient(ActionClient):
           - A tuple of the current (non-terminal) goal state
             and ``None``. otherwise.
         """
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
         if not self._goal_handle:
             self.logger.error('no goals awaited')
@@ -392,7 +392,7 @@ class GroupedSimpleActionClient(ActionClient):
             return GoalStatus.STATUS_UNKNOWN, None  # goal REJECTED
 
         self._goal_handles[goal.group_name] = goal_handle
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             return self.status(goal.group_name), None
         return self.wait(goal.group_name, timeout_sec=timeout_sec)
 
@@ -417,7 +417,7 @@ class GroupedSimpleActionClient(ActionClient):
           - A tuple of the current (non-terminal) goal state
             and ``None``. otherwise.
         """
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
         goal_handle = self._goal_handles.get(group_name)
         if not goal_handle:

@@ -106,7 +106,7 @@ class ServiceClient(object):
 
         self._response = None
         self._client.call_async(request).add_done_callback(_response_cb)
-        if timeout_sec and timeout_sec <= 0.0:
+        if timeout_sec is not None and timeout_sec <= 0.0:
             return
         return self.wait(timeout_sec=timeout_sec)
 
