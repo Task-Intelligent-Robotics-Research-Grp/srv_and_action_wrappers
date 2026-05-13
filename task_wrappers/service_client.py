@@ -101,7 +101,7 @@ class ServiceClient(object):
         """
         def _response_cb(future):
             with self._response_cond:
-                self._response = future.result().response
+                self._response = future.result()
                 self._response_cond.notify_all()
 
         self._response = None
