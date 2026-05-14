@@ -263,7 +263,7 @@ class SimpleActionClient(ActionClient):
         self._goal_handle = None
 
     def send_goal(self, goal, *, feedback_callback=None,
-                  timeout_sec: Optional[float]=None,
+                  timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait for the result.
 
@@ -355,7 +355,7 @@ class GroupedSimpleActionClient(ActionClient):
         self._goal_handles = {}
 
     def send_goal(self, goal, *, feedback_callback=None,
-                  timeout_sec: Optional[float]=None,
+                  timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait for the result.
 
