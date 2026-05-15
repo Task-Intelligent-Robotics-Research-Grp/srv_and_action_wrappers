@@ -186,7 +186,7 @@ class ActionServer(object):
 
         self._user_execute_cb = execute_callback
         if not goal_callback:
-            goal_callback = self._goal_cb
+            goal_callback = self._default_goal_cb
         self._server = rclpy.action.server.ActionServer(
                            node, action_type, action_name,
                            callback_group=callback_group,
@@ -203,7 +203,7 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
-    def _goal_cb(self, goal_request):
+    def _default_goal_cb(self, goal_request):
         self._logger.info('new goal ACCEPTED')
         return GoalResponse.ACCEPT
 

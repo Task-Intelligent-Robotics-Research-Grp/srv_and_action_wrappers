@@ -36,7 +36,7 @@ def launch_setup(context):
              output='screen'),
         Node(package='task_wrappers',
              executable='test_simple_action_client',
-             prefix=['xterm -fn 7x14 -e'],
+             prefix=['gnome-terminal --geometry=80x60 --'],
              output='screen'),
     ]
 
