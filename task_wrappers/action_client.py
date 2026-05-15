@@ -183,7 +183,7 @@ class ActionClient(object):
 
         :param timeout_sec: Seconds to wait. If ``None``, then wait forever.
         :return: ``True`` if server became ready while waiting
-            or ``False`` on a timeout.
+          or ``False`` on a timeout.
         """
         if not self._client.wait_for_server(timeout_sec):
             self._logger.error('timeout[%fsec] expired before connection to action server[%s] establised'
@@ -203,7 +203,7 @@ class ActionClient(object):
 
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
-            with the goal.
+          with the goal.
         :param goal_handle_timeout_sec: Timeout time waiting for the goal
           handle in seconds.
           - Seconds to wait for the goal handle, if positive.
@@ -275,7 +275,7 @@ class SimpleActionClient(ActionClient):
 
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
-            with the goal.
+          with the goal.
         :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait for result, if positive.
           - Wait forever, if ``None``.
@@ -368,20 +368,20 @@ class GroupedSimpleActionClient(ActionClient):
 
         :param goal: The goal request.
         :param feedback_callback: Callback function for feedback associated
-            with the goal.
+          with the goal.
         :param timeout_sec: Timeout time waiting for the result in seconds.
-        - Seconds to wait for result, if positive.
-        - Wait forever, if ``None``.
-        - Return immediately, i.e. asynchronous request, if zero or negative.
+          - Seconds to wait for result, if positive.
+          - Wait forever, if ``None``.
+          - Return immediately, i.e. asynchronous request, if zero or negative.
         :param goal_handle_timeout_sec: Timeout time waiting for the goal
-            handle in seconds.
-        - Seconds to wait for goal handle, if positive
-        - Wait forever, if ``None``.
-        - Raise ``TimeoutError`` on a timeout or if non-positive.
+          handle in seconds.
+          - Seconds to wait for goal handle, if positive
+          - Wait forever, if ``None``.
+          - Raise ``TimeoutError`` on a timeout or if non-positive.
         :return:
-        - A tuple of the goal status and the action result,
+          - A tuple of the goal status and the action result,
             if the result becomes available within ``timeout_sec``.
-        - A tuple of the current (non-terminal) goal state
+          - A tuple of the current (non-terminal) goal state
             and ``None`` on a timeout or if the request has not been
             accepted within ``goal_handle_timeout_sec``.
         """
@@ -410,7 +410,7 @@ class GroupedSimpleActionClient(ActionClient):
         :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait, if positive.
           - Wait forever, if ``None``.
-        - Raise ``ValueError``, if zero or negative.
+          - Raise ``ValueError``, if zero or negative.
         :return:
           - A tuple of the goal status and the action result,
             if the result becomes available within ``timeout_sec``.
