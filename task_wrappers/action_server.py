@@ -100,20 +100,22 @@ class ServerGoalHandlesDict(object):
     """
     def __init__(self,
                  buffer_type: Union[ServerGoalHandleBuffer,
-                                    ServerGoalHandleQueue]):
+                                    ServerGoalHandleQueue],
+                 group_field: str):
         super().__init__()
         self._buffer_type = buffer_type
+        self._group_field = group_field
         self._dict        = {}
 
     def append(self, goal_handle: ServerGoalHandle) -> None:
-        group_name = goal_handle.request.group_name
-        if not group_name in self._dict:
-            self._dict[group_name] = self._buffer_type()
-        self._dict[group_name].append(goal_handle)
+        group = getattr(goal_handle.request, self._group_field)
+        if not group in self._dict:
+            self._dict[group] = self._buffer_type()
+        self._dict[group].append(goal_handle)
 
     def remove(self, goal_handle: ServerGoalHandle) -> None:
-        group_name = goal_handle.request.group_name
-        self._dict[group_name].remove(goal_handle)
+        group = getattr(goal_handle.request, self._group_field)
+        self._dict[group].remove(goal_handle)
 
 #************************************************************************
 #  class ActionServer                                                   *
@@ -128,7 +130,7 @@ class ActionServer(object):
                  callback_group: Optional[CallbackGroup]=None,
                  goal_callback=None,
                  goal_processing_policy: str='single',
-                 grouping: bool=False):
+                 group_field: str=''):
         """Create an ActionServer.
 
         :param node: The ROS node to add the action server to.
@@ -153,14 +155,14 @@ class ActionServer(object):
               preceeding goals are completed.
             - If 'multi', then the server processes multiple goals in parallel.
             - Otherwise, raises ``ValueError``.
-        :param grouping: Enables/Disables grouping of incoming goals
-            by a field named `group_name` in the goal request. This parameter
-            has no effect when `goal_processing_policy` is 'multi'.
-            - If `True`, grouping is enabled and the requests belonging to
-              different groups will be processed in parallel while the requests
-              in a same group will be processed according to the policy
-              specified by ``goal_processing_policy``.
-            - If ``False``, grouping is disabled.
+        :param group_field: Field name of the goal request which is used for
+            grouping the incoming goals. This parameter  has no effect when
+            `goal_processing_policy` is 'multi'.
+            - If non-empty string, grouping is enabled and the requests
+              belonging to different groups will be processed in parallel
+              while the requests in a same group will be processed
+              according to the policy specified by ``goal_processing_policy``.
+            - If empty string, grouping is disabled.
         """
         super().__init__()
 
@@ -168,15 +170,16 @@ class ActionServer(object):
 
         # Server settings
         if goal_processing_policy == 'single':
-            if grouping:
+            if group_field != '':
                 self._goal_handles \
-                    = ServerGoalHandlesDict(ServerGoalHandleBuffer)
+                    = ServerGoalHandlesDict(ServerGoalHandleBuffer,
+                                            group_field)
             else:
                 self._goal_handles = ServerGoalHandleBuffer()
         elif goal_processing_policy == 'queued':
-            if grouping:
+            if group_field != '':
                 self._goal_handles \
-                    = ServerGoalHandlesDict(ServerGoalHandleQueue)
+                    = ServerGoalHandlesDict(ServerGoalHandleQueue, group_field)
             else:
                 self._goal_handles = ServerGoalHandleQueue()
         elif goal_processing_policy == 'multi':

@@ -46,12 +46,12 @@ class TestActionServer(Node):
     def __init__(self):
         super().__init__('test_action_server')
 
-        policy   = self.declare_parameter('policy', 'single').value
-        grouping = self.declare_parameter('grouping', False).value
+        policy      = self.declare_parameter('policy', 'single').value
+        group_field = self.declare_parameter('group_field', '').value
         self._server = ActionServer(self, Fibonacci, 'fibonacci',
                                     self._execute_cb,
                                     goal_processing_policy=policy,
-                                    grouping=grouping)
+                                    group_field=group_field)
 
     def _execute_cb(self, goal_handle):
         feedback = Fibonacci.Feedback(sequence=[0, 1])
