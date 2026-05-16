@@ -391,22 +391,25 @@ class GroupedSimpleActionClient(ActionClient):
         if not goal_handle:
             return GoalStatus.STATUS_UNKNOWN, None  # goal REJECTED
 
-        self._goal_handles[goal.group_name] = goal_handle
+        group = getattr(goal_handle.request, self._group_field)
+        self._goal_handles[group] = goal_handle
         if timeout_sec is not None and timeout_sec <= 0.0:
-            return self.status(goal.group_name), None
-        return self.wait(goal.group_name, timeout_sec=timeout_sec)
+            return self.status(group), None
+        return self.wait(group, timeout_sec=timeout_sec)
 
-    def status(self, group_name: str) -> int:
-        goal_handle = self._goal_handles.get(group_name)
-        return goal_handle.status if goal_handle else GoalStatus.STATUS_UNKNOWN
+    def status(self, group) -> int:
+        goal_handle = self._goal_handles.get(group)
+        if not goal_handle:
+            return GoalStatus.STATUS_UNKNOWN
+        return goal_handle.status
 
-    def wait(self, group_name: str, *, timeout_sec: Optional[float]=None):
+    def wait(self, group, *, timeout_sec: Optional[float]=None):
         """Wait for status and result of the goal/cancel request.
 
         Wait until the result of the goal request issued by `send_goal()`
         or cancel request issued by `cancel_goal()` becomes available.
 
-        :param group_name: Group name of the goal to be waited for.
+        :param group: Group of the goal to be waited for.
         :param timeout_sec: Timeout time waiting for the result in seconds.
           - Seconds to wait, if positive.
           - Wait forever, if ``None``.
@@ -419,20 +422,20 @@ class GroupedSimpleActionClient(ActionClient):
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
-        goal_handle = self._goal_handles.get(group_name)
+        goal_handle = self._goal_handles.get(group)
         if not goal_handle:
             self.logger.error('no goals awaited')
             return GoalStatus.STATUS_UNKNOWN, None
         return goal_handle.wait(timeout_sec=timeout_sec)
 
-    def cancel_goal(self, group_name: str) -> None:
+    def cancel_goal(self, group) -> None:
         """Asynchronous request for the current goal be canceled.
 
         You can get the result of the cancel request by calling `wait()`.
 
-        :param group_name: Group name of the goal to be canceled.
+        :param group: Group of the goal to be canceled.
         """
-        goal_handle = self._goal_handles.get(group_name)
+        goal_handle = self._goal_handles.get(group)
         if not goal_handle:
             return
         goal_handle.cancel_goal()
