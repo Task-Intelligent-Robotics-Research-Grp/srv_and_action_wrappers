@@ -166,8 +166,6 @@ class ActionServer(object):
         """
         super().__init__()
 
-        self._logger = node.get_logger()
-
         # Server settings
         if goal_processing_policy == 'single':
             if group_field != '':
@@ -197,7 +195,15 @@ class ActionServer(object):
                            goal_callback=goal_callback,
                            handle_accepted_callback=self._handle_accepted_cb,
                            cancel_callback=self._cancel_cb)
-        self._logger.info('action server[%s] started' % action_name)
+        self.logger.info('action server[%s] started' % action_name)
+
+    @property
+    def node(self):
+        return self._server._node
+
+    @property
+    def logger(self):
+        return self.node.get_logger()
 
     @staticmethod
     def goal_id_str(goal_handle):
@@ -207,34 +213,34 @@ class ActionServer(object):
         return s
 
     def _default_goal_cb(self, goal_request):
-        self._logger.info('new goal ACCEPTED')
+        self.logger.info('new goal ACCEPTED')
         return GoalResponse.ACCEPT
 
     def _handle_accepted_cb(self, goal_handle):
         self._goal_handles.append(goal_handle)
 
     def _cancel_cb(self, goal_handle):
-        self._logger.warn('cancel request for goal[%s] received'
-                          % ActionServer.goal_id_str(goal_handle))
+        self.logger.warn('cancel request for goal[%s] received'
+                         % ActionServer.goal_id_str(goal_handle))
         return CancelResponse.ACCEPT
 
     def _execute_cb(self, goal_handle):
-        self._logger.info('goal[%s] started'
-                          % ActionServer.goal_id_str(goal_handle))
+        self.logger.info('goal[%s] started'
+                         % ActionServer.goal_id_str(goal_handle))
         try:
             return self._user_execute_cb(goal_handle)
         finally:
             self._goal_handles.remove(goal_handle)
             if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:
-                self._logger.info('goal[%s] SUCCEEDED'
-                                  % ActionServer.goal_id_str(goal_handle))
+                self.logger.info('goal[%s] SUCCEEDED'
+                                 % ActionServer.goal_id_str(goal_handle))
             elif goal_handle.status == GoalStatus.STATUS_CANCELED:
-                self._logger.warn('goal[%s] CANCELED'
-                                  % ActionServer.goal_id_str(goal_handle))
+                self.logger.warn('goal[%s] CANCELED'
+                                 % ActionServer.goal_id_str(goal_handle))
             elif goal_handle.status == GoalStatus.STATUS_ABORTED:
-                self._logger.error('goal[%s] ABORTED'
-                                   % ActionServer.goal_id_str(goal_handle))
+                self.logger.error('goal[%s] ABORTED'
+                                  % ActionServer.goal_id_str(goal_handle))
             else:
-                self._logger.error('goal[%s] terminated with status[%d]'
-                                   % (ActionServer.goal_id_str(goal_handle),
-                                      goal_handle.status))
+                self.logger.error('goal[%s] terminated with status[%d]'
+                                  % (ActionServer.goal_id_str(goal_handle),
+                                     goal_handle.status))

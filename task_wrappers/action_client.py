@@ -162,15 +162,18 @@ class ActionClient(object):
         """
         super().__init__()
 
-        self._logger = node.get_logger()
         self._client = rclpy.action.client.ActionClient(
                            node, action_type, action_name,
                            callback_group=callback_group)
-        self._logger.info('action client[%s] started' % action_name)
+        self.logger.info('action client[%s] started' % action_name)
+
+    @property
+    def node(self):
+        return self._client._node
 
     @property
     def logger(self):
-        return self._logger
+        return self.node.get_logger()
 
     @staticmethod
     def goal_status_str(status: int) -> str:
@@ -186,10 +189,10 @@ class ActionClient(object):
           or ``False`` on a timeout.
         """
         if not self._client.wait_for_server(timeout_sec):
-            self._logger.error('timeout[%fsec] expired before connection to action server[%s] establised'
-                               % (timeout_sec, self._client._action_name))
+            self.logger.error('timeout[%fsec] expired before connection to action server[%s] establised'
+                              % (timeout_sec, self._client._action_name))
             return False
-        self._logger.info('connection to action server[%s] established'
+        self.logger.info('connection to action server[%s] established'
                           % self._client._action_name)
         return True
 
@@ -232,11 +235,11 @@ class ActionClient(object):
         with goal_handle_cond:
             if not goal_handle_cond.wait_for(lambda: goal_handle is not None,
                                              goal_handle_timeout_sec):
-                self._logger.error('timeout[%fsec] has expired'
-                                   % goal_handle_timeout_sec)
+                self.logger.error('timeout[%fsec] has expired'
+                                  % goal_handle_timeout_sec)
                 raise TimeoutError()
             elif not goal_handle.accepted:
-                self._logger.error('goal REJECTED')
+                self.logger.error('goal REJECTED')
                 return
             return goal_handle
 
@@ -348,10 +351,11 @@ class GroupedSimpleActionClient(ActionClient):
     """ ROS Action client that tracks only one goal for each group at a time.
     """
     def __init__(self, node: Node, action_type, action_name: str, *,
-                 callback_group=None):
+                 callback_group=None, group_field: str=''):
         super().__init__(node, action_type, action_name,
                          callback_group=callback_group)
 
+        self._group_field  = group_field
         self._goal_handles = {}
 
     def send_goal(self, goal, *, feedback_callback=None,
