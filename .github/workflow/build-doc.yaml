@@ -1,0 +1,33 @@
+name: build-doc
+on: push
+
+jobs:
+  build-doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: task_wrappers
+
+    - name: Install dependencies
+      run: |
+        sudo apt install graphviz doxygen python3-doxypypy
+
+    - name: Build documents of task_wrappers
+      run: |
+        cd ./task_wrappers
+        doxygen
+
+    - name: Upload artifact of task_wrappers
+      uses: actions/upload-pages-artifact@v4
+      with:
+        path: ./task_wrappers/docs/html
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v5
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write

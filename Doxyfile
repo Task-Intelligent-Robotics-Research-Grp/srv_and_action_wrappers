@@ -3,13 +3,11 @@
 # Set the project name
 PROJECT_NAME           = task_wrappers
 
-INPUT_FILTER           = /usr/local/bin/doxyfilter_python.py
+FILTER_PATTERNS        = *.py="doxypypy -a -c"
 
-# Set the output directory for the generated documentation
 OUTPUT_DIRECTORY       = docs
-<!-- USE_MDFILE_AS_MAINPAGE = ./README.md
-Input                  = ./README.md -->
 
+USE_MDFILE_AS_MAINPAGE = ./README.md
 
 FULL_PATH_NAMES        = NO
 

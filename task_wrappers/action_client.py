@@ -45,10 +45,13 @@ from builtin_interfaces.msg     import Time
 #*********************************************************************
 class ClientGoalHandle(object):
     """Goal handle for Action Clients with a function awaiting result.
-
     This class wraps ``rclpy.action.client.ClientGoalHandle``.
     """
     def __init__(self, goal_handle: rclpy.action.client.ClientGoalHandle):
+        """
+        Args:
+          goal_handle: Goal handle to be wrapped.
+        """
         super().__init__()
 
         self._goal_handle = goal_handle
@@ -57,25 +60,31 @@ class ClientGoalHandle(object):
 
     @property
     def accepted(self) -> bool:
+        """ Flag indicating whether this goal handle is accepted or not.
+        """
         return self._goal_handle.accepted
 
     @property
     def goal_id(self) -> UUID:
+        """ UUID of this goal handle.
+        """
         return self._goal_handle.goal_id
 
     @property
     def stamp(self) -> Time:
+        """ Timestamp of this goal handle.
+        """
         return self._goal_handle.stamp
 
     @property
     def status(self) -> int:
+        """ Status of this goal handle.
+        """
         return self._goal_handle.status
 
     @property
     def goal_id_str(self) -> str:
-        """String representation of goal's UUID.
-
-        :return: goal UUID encoded to string.
+        """ String representation of goal's UUID.
         """
         s = '0x'
         for i in self.goal_id.uuid:
@@ -83,21 +92,23 @@ class ClientGoalHandle(object):
         return s
 
     def wait(self, *, timeout_sec: Optional[float]=None):
-        """Wait for result of the goal/cancel request.
+        """ Wait for result of the goal/cancel request.
+        Blocked until the result of goal or cancel request issued by
+        `ActionClient.send_goal()` or `ClientGoalHandle.cancel_goal()`
+        respecitvely becomes available.
 
-        Wait until the result of the goal request issued by
-        `ActionClient.send_goal()` or cancel request issued by `cancel_goal()`
-        becomes available.
+        Args:
+          timeout_sec: Timeout time waiting for the result. Seconds to wait,
+            if positive. Wait forever, if `None`.
 
-        :param timeout_sec: Timeout time waiting for the result in seconds.
-          - Seconds to wait, if positive.
-          - Wait forever, if ``None``.
-          - Raise ``ValueError``, if zero or negative.
-        :return:
-          - A tuple of the goal status and the action result,
-            if the result becomes available within ``timeout_sec``.
-          - A tuple of the current (non-terminal) goal state
-            and ``None``, otherwise.
+        Returns:
+          * A tuple of the goal status and the action result,
+            if the result becomes available within `timeout_sec`.
+          * A tuple of the current (non-terminal) goal state
+            and `None`, otherwise.
+
+        Raises:
+          ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
@@ -118,7 +129,6 @@ class ClientGoalHandle(object):
 
     def cancel_goal(self) -> None:
         """Asynchronous request for the goal be canceled.
-
         Result of the cancel request is available by calling `wait()`.
         """
         def _cancel_response_cb(future):
@@ -135,8 +145,7 @@ class ClientGoalHandle(object):
 #  class ActionClient                                                *
 #*********************************************************************
 class ActionClient(object):
-    """ROS Action client synchronously awaiting goal handle.
-
+    """ ROS Action client synchronously awaiting goal handle.
     This class wraps ``rclpy.action.client.ActionClient``.
     """
     _GoalStatus = [
@@ -151,13 +160,13 @@ class ActionClient(object):
 
     def __init__(self, node, action_type, action_name: str, *,
                  callback_group=None):
-        """Create an ActionClient.
-
-        :param node: The ROS node to add the action client to.
-        :param action_type: Type of the action.
-        :param action_name: Name of the action.
+        """
+        Args:
+          node: The ROS node to add the action client to.
+          action_type: Type of the action.
+          action_name: Name of the action.
             Used as part of the underlying topic and service names.
-        :param callback_group: Callback group to add the action client to.
+          callback_group: Callback group to add the action client to.
             If None, then the node's default callback group is used.
         """
         super().__init__()
@@ -181,12 +190,13 @@ class ActionClient(object):
 
     def wait_for_server(self, timeout_sec: Optional[float]=None) -> bool:
         """Wait for a action server to become ready.
-
         Returns as soon as a server becomes ready or if the timeout expires.
 
-        :param timeout_sec: Seconds to wait. If ``None``, then wait forever.
-        :return: ``True`` if server became ready while waiting
-          or ``False`` on a timeout.
+        Args:
+          timeout_sec: Seconds to wait. If `None`, then wait forever.
+
+        Returns:
+          `True` if server became ready while waiting or `False` on a timeout.
         """
         if not self._client.wait_for_server(timeout_sec):
             self.logger.error('timeout[%fsec] expired before connection to action server[%s] establised'
@@ -200,22 +210,23 @@ class ActionClient(object):
                   goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait until the corresponding
         goal handle will be returned.
-
         This call is synchronous, that is, blocked until the goal handle
-        becomes available or the specified timeout expires.
+        will be returned or the specified timeout expires.
 
-        :param goal: The goal request.
-        :param feedback_callback: Callback function for feedback associated
-          with the goal.
-        :param goal_handle_timeout_sec: Timeout time waiting for the goal
-          handle in seconds.
-          - Seconds to wait for the goal handle, if positive.
-          - Wait forever, if ``None``.
-          - Raise ``ValueError``, if zero or negative.
-        :return:
-          - Goal handle, if the request is accepted within ``timeout_sec``.
-          - ``None``,  if the request is rejected.
-          - Raise ``TimeoutError`` on a timeout.
+        Args:
+          goal: The goal request.
+          feedback_callback: Callback function for feedback associated
+            with the goal.
+          goal_handle_timeout_sec: Timeout time waiting for the goal handle.
+            Seconds to wait, if positive. Wait forever, if `None`.
+
+        Returns:
+          Goal handle, if the request is accepted within
+          `goal_handle_timeout_sec`. `None`, if the request is rejected.
+
+        Raises:
+          ValueError: if `goal_handle_timeout_sec` is zero or negative.
+          TimeoutError: on a timeout.
         """
         if goal_handle_timeout_sec and goal_handle_timeout_sec <= 0.0:
             raise ValueError()
@@ -247,17 +258,17 @@ class ActionClient(object):
 #  class SimpleActionClient                                          *
 #*********************************************************************
 class SimpleActionClient(ActionClient):
-    """ ROS Action client that tracks only one goal at a time.
+    """ ROS action client that tracks only one goal at a time.
     """
     def __init__(self, node: Node, action_type, action_name: str, *,
                  callback_group=None):
-        """Create a SimpleActionClient.
-
-        :param node: The ROS node to add the action client to.
-        :param action_type: Type of the action.
-        :param action_name: Name of the action.
+        """
+        Args:
+          node: The ROS node to add the action client to.
+          action_type: Type of the action.
+          action_name: Name of the action.
             Used as part of the underlying topic and service names.
-        :param callback_group: Callback group to add the action client to.
+          callback_group: Callback group to add the action client to.
             If None, then the node's default callback group is used.
         """
         super().__init__(node, action_type, action_name,
@@ -269,31 +280,34 @@ class SimpleActionClient(ActionClient):
                   timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait for the result.
-
-        After sending request, wait for the goal handle first. Then,
-        if the goal is accepted, wait for its result. If zero or negative
+        After sending request, wait for the goal handle first and then
+        wait for its result, if the goal is accepted. If zero or negative
         timeout time is specified, the call returns immediately after
         the goal handle becomes available, that is, asynchronous call.
         In this case, the result should be obtained by calling 'wait()'.
 
-        :param goal: The goal request.
-        :param feedback_callback: Callback function for feedback associated
-          with the goal.
-        :param timeout_sec: Timeout time waiting for the result in seconds.
-          - Seconds to wait for result, if positive.
-          - Wait forever, if ``None``.
-          - Return immediately, i.e. asynchronous request, if zero or negative.
-        :param goal_handle_timeout_sec: Timeout time waiting for the goal
-          handle in seconds.
-          - Seconds to wait for goal handle, if positive.
-          - Wait forever, if ``None``.
-          - Raise ``TimeoutError`` on a timeout or if non-positive.
-        :return:
-          - A tuple of the goal status and the action result,
-            if the result becomes available within ``timeout_sec``.
-          - A tuple of the current (non-terminal) goal state
-            and ``None`` on a timeout or if the request has not been
-            accepted within ``goal_handle_timeout_sec``.
+        Args:
+          goal: The goal request.
+          feedback_callback: Callback function for feedback associated
+            with the goal.
+          timeout_sec: Timeout time waiting for the result in seconds.
+            Seconds to wait for result, if positive. Wait forever, if `None`.
+            Return immediately, i.e. asynchronous request, if zero or negative.
+          goal_handle_timeout_sec: Timeout time waiting for the goal
+            handle in seconds. Seconds to wait for goal handle, if positive.
+            Wait forever, if `None`.
+
+        Returns:
+          * A tuple of the goal status and the action result,
+            if the result becomes available within `timeout_sec`.
+          * A tuple of the current (non-terminal) goal state
+            and `None` on a timeout or if the goal request has not been
+            accepted or goal handle has not been returned within
+            `goal_handle_timeout_sec`.
+
+        Raises:
+          ValueError: if `goal_handle_timeout_sec` is zero or negative.
+          TimeoutError: on a timeout waiting for goal handle.
         """
         goal_handle = super().send_goal(
                           goal, feedback_callback=feedback_callback,
@@ -309,24 +323,28 @@ class SimpleActionClient(ActionClient):
 
     @property
     def status(self) -> int:
+        """ Status of the underlying goal handle
+        """
         return self._goal_handle.status if self._goal_handle else \
                GoalStatus.STATUS_UNKNOWN
 
     def wait(self, *, timeout_sec: Optional[float]=None):
-        """Wait for status and result of the goal/cancel request.
+        """ Wait for status and result of the goal/cancel request.
+        Blocked until the result of goal or cancel request issued by
+        `send_goal()` or `cancel_goal()` respecitvely becomes available.
 
-        Wait until the result of the goal request issued by `send_goal()`
-        or cancel request issued by `cancel()` becomes available.
+        Args:
+          timeout_sec: Timeout time waiting for the result.
+            Seconds to wait, if positive. Wait forever, if `None`.
 
-        :param timeout_sec: Timeout time in seconds.
-          - Seconds to wait, if positive.
-          - Wait forever, if ``None``.
-          - Raise ``ValueError``, if zero or negative.
-        :return:
-          - A tuple of the goal status and the action result,
-            if the result becomes available within ``timeout_sec``.
-          - A tuple of the current (non-terminal) goal state
-            and ``None``. otherwise.
+        Returns:
+          * A tuple of the goal status and the action result,
+            if the result becomes available within `timeout_sec`.
+          * A tuple of the current (non-terminal) goal state
+            and `None`. otherwise.
+
+        Raises:
+          ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
@@ -337,7 +355,6 @@ class SimpleActionClient(ActionClient):
 
     def cancel_goal(self) -> None:
         """Asynchronous request for the current goal be canceled.
-
         You can get the result of the cancel request by calling `wait()`.
         """
         if not self._goal_handle:
@@ -348,10 +365,21 @@ class SimpleActionClient(ActionClient):
 #  class GroupedSimpleActionClient                                   *
 #*********************************************************************
 class GroupedSimpleActionClient(ActionClient):
-    """ ROS Action client that tracks only one goal for each group at a time.
+    """ ROS action client that tracks only one goal for each group at a time.
     """
     def __init__(self, node: Node, action_type, action_name: str, *,
                  callback_group=None, group_field: str=''):
+        """
+        Args:
+          node: The ROS node to add the action client to.
+          action_type: Type of the action.
+          action_name: Name of the action.
+            Used as part of the underlying topic and service names.
+          callback_group: Callback group to add the action client to.
+            If None, then the node's default callback group is used.
+          group_field: Name of the field in the goal request specifying
+            a group.
+        """
         super().__init__(node, action_type, action_name,
                          callback_group=callback_group)
 
@@ -361,33 +389,35 @@ class GroupedSimpleActionClient(ActionClient):
     def send_goal(self, goal, *, feedback_callback=None,
                   timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
-        """Send a goal request to the server and wait for the result.
-
+        """ Send a goal request to the server and wait for the result.
         After sending request, wait for the goal handle first.
         If the request is accepted, then wait for its result. If zero
-        or negative ``timeout_time`` is specified, the call returns
+        or negative `timeout_time` is specified, the call returns
         immediately after the goal handle becomes available, that is,
         asynchronous call. In this case, the result should be obtained
         by calling 'wait()'.
 
-        :param goal: The goal request.
-        :param feedback_callback: Callback function for feedback associated
-          with the goal.
-        :param timeout_sec: Timeout time waiting for the result in seconds.
-          - Seconds to wait for result, if positive.
-          - Wait forever, if ``None``.
-          - Return immediately, i.e. asynchronous request, if zero or negative.
-        :param goal_handle_timeout_sec: Timeout time waiting for the goal
-          handle in seconds.
-          - Seconds to wait for goal handle, if positive
-          - Wait forever, if ``None``.
-          - Raise ``TimeoutError`` on a timeout or if non-positive.
-        :return:
-          - A tuple of the goal status and the action result,
-            if the result becomes available within ``timeout_sec``.
-          - A tuple of the current (non-terminal) goal state
-            and ``None`` on a timeout or if the request has not been
-            accepted within ``goal_handle_timeout_sec``.
+        Args:
+          goal: Goal request.
+          feedback_callback: Callback function for feedback associated
+            with the goal.
+          timeout_sec: Timeout time waiting for the result in seconds.
+            Seconds to wait for result, if positive. Wait forever, if `None`.
+            Return immediately, i.e. asynchronous request, if zero or negative.
+          goal_handle_timeout_sec: Timeout time waiting for the goal
+            handle in seconds.Seconds to wait for goal handle, if positive.
+            Wait forever, if `None`.
+
+        Returns:
+          * A tuple of the goal status and the action result,
+            if the result becomes available within `timeout_sec`.
+          * A tuple of the current (non-terminal) goal state and `None`
+            on a timeout or if the goal request has not been accepted or goal
+            handle has not been returned within `goal_handle_timeout_sec`.
+
+        Raises:
+          ValueError: if `goal_handle_timeout_sec` is zero or negative.
+          TimeoutError: on a timeout.
         """
         goal_handle = super().send_goal(
                           goal, feedback_callback=feedback_callback,
@@ -402,27 +432,31 @@ class GroupedSimpleActionClient(ActionClient):
         return self.wait(group, timeout_sec=timeout_sec)
 
     def status(self, group) -> int:
+        """ Status of the underlying goal handle of the specified group
+        """
         goal_handle = self._goal_handles.get(group)
         if not goal_handle:
             return GoalStatus.STATUS_UNKNOWN
         return goal_handle.status
 
     def wait(self, group, *, timeout_sec: Optional[float]=None):
-        """Wait for status and result of the goal/cancel request.
+        """ Wait for status and result of the goal/cancel request.
+        Blocked until the result of goal or cancel request issued by
+        `send_goal()` or `cancel_goal()` respecitvely becomes available.
 
-        Wait until the result of the goal request issued by `send_goal()`
-        or cancel request issued by `cancel_goal()` becomes available.
+        Args:
+          group: Group of the goal to be waited for.
+          timeout_sec: Timeout time waiting for the result.
+            Seconds to wait, if positive. Wait forever, if `None`.
 
-        :param group: Group of the goal to be waited for.
-        :param timeout_sec: Timeout time waiting for the result in seconds.
-          - Seconds to wait, if positive.
-          - Wait forever, if ``None``.
-          - Raise ``ValueError``, if zero or negative.
-        :return:
-          - A tuple of the goal status and the action result,
-            if the result becomes available within ``timeout_sec``.
-          - A tuple of the current (non-terminal) goal state
-            and ``None``. otherwise.
+        Returns:
+          * A tuple of the goal status and the action result,
+            if the result becomes available within `timeout_sec`.
+          * A tuple of the current (non-terminal) goal state
+            and `None`. otherwise.
+
+        Raises:
+          ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
@@ -433,11 +467,11 @@ class GroupedSimpleActionClient(ActionClient):
         return goal_handle.wait(timeout_sec=timeout_sec)
 
     def cancel_goal(self, group) -> None:
-        """Asynchronous request for the current goal be canceled.
-
+        """ Asynchronous request for the current goal be canceled.
         You can get the result of the cancel request by calling `wait()`.
 
-        :param group: Group of the goal to be canceled.
+        Args:
+          group: Group of the goal to be canceled.
         """
         goal_handle = self._goal_handles.get(group)
         if not goal_handle:
