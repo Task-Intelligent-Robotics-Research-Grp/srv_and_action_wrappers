@@ -96,7 +96,7 @@ class TaskServer(ActionServer):
                          goal_processing_policy=goal_processing_policy,
                          group_field=group_field)
 
-    def wait_for_stage_completed(stage_name: str, timeout_sec=None):
+    def wait_for_stage(stage_name: str, timeout_sec=None):
         pass
 
     def _execute_cb(self, goal_handle):
