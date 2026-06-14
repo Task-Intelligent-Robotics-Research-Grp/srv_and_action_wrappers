@@ -99,10 +99,7 @@ class TaskClient(ActionClient):
                                                     timeout_sec)
 
     def _feedback_cb(self, feedback):
-        if feedback.current_stage == self._target_stage:
-            with self._target_stage_cond:
-                self._target_stage = None
-                self._target_stage_cond.notifyAll()
+        feedback.goal_handle._reached_stage(feedback.feedback.current_stage)
 
 #*********************************************************************
 #  class SimpleTaskClient                                            *

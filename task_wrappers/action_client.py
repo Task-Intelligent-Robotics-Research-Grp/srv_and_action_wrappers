@@ -54,9 +54,10 @@ class ClientGoalHandle(object):
         """
         super().__init__()
 
-        self._goal_handle = goal_handle
-        self._result      = None
-        self._result_cond = threading.Condition()
+        self._goal_handle  = goal_handle
+        self._result       = None
+        self._result_cond  = threading.Condition()
+        self._target_stage = ''
 
     @property
     def accepted(self) -> bool:
@@ -91,13 +92,14 @@ class ClientGoalHandle(object):
             s += format(i, '02x')
         return s
 
-    def wait(self, *, timeout_sec: Optional[float]=None):
+    def wait(self, *, target_stage: str='', timeout_sec: Optional[float]=None):
         """ Wait for result of the goal/cancel request.
         Blocked until the result of goal or cancel request issued by
         `ActionClient.send_goal()` or `ClientGoalHandle.cancel_goal()`
         respecitvely becomes available.
 
         Args:
+          target_stage: Stage name waited for, unless empty.
           timeout_sec: Timeout time waiting for the result. Seconds to wait,
             if positive. Wait forever, if `None`.
 
@@ -113,6 +115,8 @@ class ClientGoalHandle(object):
         if timeout_sec is not None and timeout_sec <= 0.0:
             raise ValueError()
 
+        self._target_stage = target_stage
+
         def _result_cb(future):
             with self._result_cond:
                 self._result = (future.result().status, future.result().result)
@@ -122,7 +126,8 @@ class ClientGoalHandle(object):
             self._goal_handle.get_result_async().add_done_callback(_result_cb)
             with self._result_cond:
                 if not self._result_cond.wait_for(lambda:
-                                                  self._result is not None,
+                                                  self._result is not None or \
+                                                  self._target_stage is None,
                                                   timeout_sec):
                     return (self.status, None)
         return self._result
@@ -140,6 +145,12 @@ class ClientGoalHandle(object):
 
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
+
+    def _reached_stage(self, current_stage):
+        if current_stage == self._target_stage:
+            with self._result_cond:
+                self._target_stage = None
+                self._target_stage_cond.notifyAll()
 
 #*********************************************************************
 #  class ActionClient                                                *
@@ -171,11 +182,9 @@ class ActionClient(object):
         """
         super().__init__()
 
-        self._client            = rclpy.action.client.ActionClient(
-                                      node, action_type, action_name,
-                                      callback_group=callback_group)
-        self._target_stage      = None
-        self._target_stage_cond = threading.Condition()
+        self._client = rclpy.action.client.ActionClient(
+                           node, action_type, action_name,
+                           callback_group=callback_group)
 
         self.logger.info('action client[%s] started' % action_name)
 
@@ -257,35 +266,8 @@ class ActionClient(object):
                 return
             return goal_handle
 
-    def wait_for_stage(self, target_stage, *, timeout_sec=None):
-        """ Wait for result of the goal/cancel request.
-        Blocked until the result of goal or cancel request issued by
-        `ActionClient.send_goal()` or `ClientGoalHandle.cancel_goal()`
-        respecitvely becomes available.
-
-        Args:
-          target_stage: Name of the stage waiting for.
-          timeout_sec: Timeout time waiting for the stage reached.
-            Seconds to wait, if positive. Wait forever, if `None`.
-
-        Returns:
-          * True, if the specified stage is reached with in `timeout_sec`.
-            False on a timeout.
-
-        Raises:
-          ValueError: if `timeout_sec` is zero or negative.
-        """
-        self._target_stage = target_stage
-        with self._target_stage_cond:
-            return self._target_stage_cond.wait_for(lambda:
-                                                    self._target_stage is None,
-                                                    timeout_sec)
-
     def stage_feedback_cb(self, feedback):
-        if feedback.stage == self._target_stage:
-            with self._target_stage_cond:
-                self._target_stage = None
-                self._target_stage_cond.notifyAll()
+        feedback.goal_handle._reached_stage(feedback.feedback.current_stage)
 
 #*********************************************************************
 #  class SimpleActionClient                                          *
@@ -309,7 +291,7 @@ class SimpleActionClient(ActionClient):
 
         self._goal_handle = None
 
-    def send_goal(self, goal, *, feedback_callback=None,
+    def send_goal(self, goal, *, target_srage: str='', feedback_callback=None,
                   timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
         """Send a goal request to the server and wait for the result.
@@ -352,7 +334,7 @@ class SimpleActionClient(ActionClient):
         if timeout_sec is not None and timeout_sec <= 0.0:
             return self.status, None
 
-        return self.wait(timeout_sec=timeout_sec)
+        return self.wait(target_stage=target_stage, timeout_sec=timeout_sec)
 
     @property
     def status(self) -> int:
@@ -361,7 +343,7 @@ class SimpleActionClient(ActionClient):
         return self._goal_handle.status if self._goal_handle else \
                GoalStatus.STATUS_UNKNOWN
 
-    def wait(self, *, timeout_sec: Optional[float]=None):
+    def wait(self, *, target_stage: str='', timeout_sec: Optional[float]=None):
         """ Wait for status and result of the goal/cancel request.
         Blocked until the result of goal or cancel request issued by
         `send_goal()` or `cancel_goal()` respecitvely becomes available.
@@ -384,7 +366,8 @@ class SimpleActionClient(ActionClient):
         if not self._goal_handle:
             self.logger.error('no goals awaited')
             return GoalStatus.STATUS_UNKNOWN, None
-        return self._goal_handle.wait(timeout_sec=timeout_sec)
+        return self._goal_handle.wait(target_srage=target_srage,
+                                      timeout_sec=timeout_sec)
 
     def cancel_goal(self) -> None:
         """Asynchronous request for the current goal be canceled.
@@ -419,7 +402,7 @@ class GroupedSimpleActionClient(ActionClient):
         self._group_field  = group_field
         self._goal_handles = {}
 
-    def send_goal(self, goal, *, feedback_callback=None,
+    def send_goal(self, goal, *, target_srage: str='', feedback_callback=None,
                   timeout_sec: Optional[float]=0.0,
                   goal_handle_timeout_sec: Optional[float]=None):
         """ Send a goal request to the server and wait for the result.
@@ -453,7 +436,8 @@ class GroupedSimpleActionClient(ActionClient):
           TimeoutError: on a timeout.
         """
         goal_handle = super().send_goal(
-                          goal, feedback_callback=feedback_callback,
+                          goal, target_srage=target_srage,
+                          feedback_callback=feedback_callback,
                           goal_handle_timeout_sec=goal_handle_timeout_sec)
         if not goal_handle:
             return GoalStatus.STATUS_UNKNOWN, None  # goal REJECTED
@@ -462,7 +446,8 @@ class GroupedSimpleActionClient(ActionClient):
         self._goal_handles[group] = goal_handle
         if timeout_sec is not None and timeout_sec <= 0.0:
             return self.status(group), None
-        return self.wait(group, timeout_sec=timeout_sec)
+        return self.wait(group, target_stage=target_srage,
+                         timeout_sec=timeout_sec)
 
     def status(self, group) -> int:
         """ Status of the underlying goal handle of the specified group
@@ -472,7 +457,8 @@ class GroupedSimpleActionClient(ActionClient):
             return GoalStatus.STATUS_UNKNOWN
         return goal_handle.status
 
-    def wait(self, group, *, timeout_sec: Optional[float]=None):
+    def wait(self, group, *, target_srage: str='',
+             timeout_sec: Optional[float]=None):
         """ Wait for status and result of the goal/cancel request.
         Blocked until the result of goal or cancel request issued by
         `send_goal()` or `cancel_goal()` respecitvely becomes available.
@@ -497,7 +483,8 @@ class GroupedSimpleActionClient(ActionClient):
         if not goal_handle:
             self.logger.error('no goals awaited')
             return GoalStatus.STATUS_UNKNOWN, None
-        return goal_handle.wait(timeout_sec=timeout_sec)
+        return goal_handle.wait(target_srage=target_srage,
+                                timeout_sec=timeout_sec)
 
     def cancel_goal(self, group) -> None:
         """ Asynchronous request for the current goal be canceled.
