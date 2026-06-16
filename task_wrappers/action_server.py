@@ -45,7 +45,7 @@ from typing                import Optional, Union
 #  stuffs concerning with ServerGoalHandle                              *
 #************************************************************************
 class ServerGoalHandleBuffer(object):
-    """Buffer storing a single ``ServerGoalHandle``.
+    """ Buffer storing a single ``ServerGoalHandle``.
     """
     def __init__(self):
         super().__init__()
@@ -64,7 +64,7 @@ class ServerGoalHandleBuffer(object):
             self._goal_handle = None
 
 class ServerGoalHandleQueue(object):
-    """FIFO queue storing ``ServerGoalHandle``.
+    """ FIFO queue storing ``ServerGoalHandle``.
     """
     def __init__(self):
         super().__init__()
@@ -84,7 +84,7 @@ class ServerGoalHandleQueue(object):
                 self._deque[0].execute()
 
 class ServerGoalHandlePassthrough(object):
-    """Dummy buffer storing no ``ServerGoalHandle``.
+    """ Dummy buffer storing no ``ServerGoalHandle``.
     """
     def __init__(self):
         super().__init__()
@@ -96,7 +96,7 @@ class ServerGoalHandlePassthrough(object):
         pass
 
 class ServerGoalHandlesDict(object):
-    """Dictionary of containers of ``ServerGoalHandle`` with string keys
+    """ Dictionary of containers of ``ServerGoalHandle`` with string keys.
     """
     def __init__(self,
                  buffer_type: Union[ServerGoalHandleBuffer,
@@ -121,8 +121,7 @@ class ServerGoalHandlesDict(object):
 #  class ActionServer                                                   *
 #************************************************************************
 class ActionServer(object):
-    """ROS Action server supporting multiple policies of processing goals.
-
+    """ ROS Action server supporting multiple policies of processing goals.
     This class wraps ``rclpy.action.server.ActionServer``.
     """
     def __init__(self, node: Node, action_type, action_name: str,
@@ -131,38 +130,39 @@ class ActionServer(object):
                  goal_callback=None,
                  goal_processing_policy: str='single',
                  group_field: str=''):
-        """Create an ActionServer.
+        """ Create an ActionServer.
 
-        :param node: The ROS node to add the action server to.
-        :param action_type: Type of the action.
-        :param action_name: Name of the action.
+        Args:
+          node: The ROS node to add the action server to.
+          action_type: Type of the action.
+          action_name: Name of the action.
             Used as part of the underlying topic and service names.
-        :param execute_callback: Callback function for processing accepted
+          execute_callback: Callback function for processing accepted
             goals. This is called if when :class:`ServerGoalHandle.execute()`
             is called for a goal handle that is being tracked by this action
             server.
-        :param callback_group: Callback group to add the action server to.
+          callback_group: Callback group to add the action server to.
             If ``None``, then the node's default callback group is used.
-        :param goal_callback: Callback function for handling new goal requests.
+          goal_callback: Callback function for handling new goal requests.
             If ``None``, then any goal request will be accepted.
-        :param goal_processing_policy: Specifies policy of processing goals.
-            - If 'single', then the server processes only one goal at a time.
+          goal_processing_policy: Specifies policy of processing goals.
+            * If 'single', then the server processes only one goal at a time.
               When a new goal request is recieved, the current goal under
               processing will be aborted and then new goal will be accepted.
-            - If 'queued', then the server processes only one goal at a time.
+            * If 'queued', then the server processes only one goal at a time.
               When a new goal request is recieved, it will be appended to
               FIFO queue. Its processing will be deferred until all the
               preceeding goals are completed.
-            - If 'multi', then the server processes multiple goals in parallel.
-            - Otherwise, raises ``ValueError``.
-        :param group_field: Field name of the goal request which is used for
+            * If 'multi', then the server processes multiple goals in parallel.
+            * Otherwise, raises ``ValueError``.
+          group_field: Field name of the goal request which is used for
             grouping the incoming goals. This parameter  has no effect when
             `goal_processing_policy` is 'multi'.
-            - If non-empty string, grouping is enabled and the requests
+            * If non-empty string, grouping is enabled and the requests
               belonging to different groups will be processed in parallel
               while the requests in a same group will be processed
               according to the policy specified by ``goal_processing_policy``.
-            - If empty string, grouping is disabled.
+            * If empty string, grouping is disabled.
         """
         super().__init__()
 

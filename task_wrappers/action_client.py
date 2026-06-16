@@ -44,7 +44,7 @@ from builtin_interfaces.msg     import Time
 #  class ClientGoalHandle                                            *
 #*********************************************************************
 class ClientGoalHandle(object):
-    """Goal handle for Action Clients with a function awaiting result.
+    """ Goal handle for Action Clients with a function awaiting result.
     This class wraps ``rclpy.action.client.ClientGoalHandle``.
     """
     def __init__(self, goal_handle: rclpy.action.client.ClientGoalHandle):
@@ -204,7 +204,7 @@ class ActionClient(object):
         return ActionClient._GoalStatus[status]
 
     def wait_for_server(self, timeout_sec: Optional[float]=None) -> bool:
-        """Wait for a action server to become ready.
+        """ Wait for a action server to become ready.
         Returns as soon as a server becomes ready or if the timeout expires.
 
         Args:
@@ -223,7 +223,7 @@ class ActionClient(object):
 
     def send_goal(self, goal, *, feedback_callback=None,
                   goal_handle_timeout_sec: Optional[float]=None):
-        """Send a goal request to the server and wait until the corresponding
+        """ Send a goal request to the server and wait until the corresponding
         goal handle will be returned.
         This call is synchronous, that is, blocked until the goal handle
         will be returned or the specified timeout expires.
