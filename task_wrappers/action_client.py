@@ -453,7 +453,7 @@ class GroupedSimpleActionClient(ActionClient):
         if not goal_handle:
             return GoalStatus.STATUS_UNKNOWN, None  # goal REJECTED
 
-        group = getattr(goal_handle.request, self._group_field)
+        group = getattr(goal, self._group_field)
         self._goal_handles[group] = goal_handle
         if timeout_sec is not None and timeout_sec <= 0.0:
             return self.status(group), None

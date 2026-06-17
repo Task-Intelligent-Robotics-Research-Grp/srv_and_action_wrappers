@@ -124,6 +124,11 @@ class ActionServer(object):
     """ ROS Action server supporting multiple policies of processing goals.
     This class wraps ``rclpy.action.server.ActionServer``.
     """
+    class _Preempted(Exception):
+        def __init__(self, stage):
+            super().__init__()
+            self.stage = stage
+
     def __init__(self, node: Node, action_type, action_name: str,
                  execute_callback, *,
                  callback_group: Optional[CallbackGroup]=None,
@@ -198,6 +203,10 @@ class ActionServer(object):
         self.logger.info('action server[%s] started' % action_name)
 
     @property
+    def action_type(self):
+        return self._server.action_type
+
+    @property
     def node(self):
         return self._server._node
 
@@ -212,6 +221,12 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
+    def enter_stage(self, goal_handle, next_stage, current_stage=''):
+        if goal_handle.is_cancel_requested or not goal_handle.is_active:
+            raise self._Preemted(current_stage)
+        goal_handle.publish_feedback(
+            self.action_type.Feedback(stage=next_stage))
+
     def _default_goal_cb(self, goal_request):
         self.logger.info('new goal ACCEPTED')
         return GoalResponse.ACCEPT
@@ -220,7 +235,7 @@ class ActionServer(object):
         self._goal_handles.append(goal_handle)
 
     def _cancel_cb(self, goal_handle):
-        self.logger.warn('cancel request for goal[%s] received'
+        self.logger.warn('cancel requested for goal[%s]'
                          % ActionServer.goal_id_str(goal_handle))
         return CancelResponse.ACCEPT
 
@@ -229,6 +244,24 @@ class ActionServer(object):
                          % ActionServer.goal_id_str(goal_handle))
         try:
             return self._user_execute_cb(goal_handle)
+
+        except self._Preempted as preempted:
+            if goal_handle.is_cancel_requested:
+                self.logger.warn('goal[%s] preempted at stage[%s] by cancel request from the client'
+                                 % (ActionServer.goal_id_str(goal_handle),
+                                    preempted.stage))
+                goal_handle.canceled()
+            else:
+                self.logger.warn('goal[%s] preempted at stage[%s] by another goal'
+                                 % (ActionServer.goal_id_str(goal_handle),
+                                    preempted.stage))
+            return self.action_type.Result(stage=preempted.stage)
+
+        except TimeoutError as err:
+            goal_handle.abort()
+            self.logger.error(err)
+            return self.action_type.Result()
+
         finally:
             self._goal_handles.remove(goal_handle)
             if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:

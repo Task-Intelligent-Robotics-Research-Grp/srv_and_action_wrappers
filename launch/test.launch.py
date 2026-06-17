@@ -28,7 +28,7 @@ def declare_launch_arguments(args):
 def launch_setup(context):
     return [
         Node(package='task_wrappers',
-             executable='test_action_server',
+             executable='test_task_server',
              parameters=[
                  {'policy':   LaunchConfiguration('policy'),
                   'grouping': LaunchConfiguration('grouping')}
