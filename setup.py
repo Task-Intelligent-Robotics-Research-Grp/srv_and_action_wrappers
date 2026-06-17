@@ -21,7 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'test_simple_action_client = scripts.test_simple_action_client:main',
-            'test_action_server = scripts.test_action_server:main',
+            'test_task_server = scripts.test_action_server:main',
         ],
     },
 )

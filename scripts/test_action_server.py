@@ -49,17 +49,17 @@ class TestActionServer(Node):
         policy      = self.declare_parameter('policy', 'single').value
         group_field = self.declare_parameter('group_field', '').value
         self._server = ActionServer(self, Fibonacci, 'fibonacci',
-                                    self._execute_cb,
-                                    goal_processing_policy=policy,
-                                    group_field=group_field)
+                                  self._execute_cb,
+                                  goal_processing_policy=policy,
+                                  group_field=group_field)
 
     def _execute_cb(self, goal_handle):
         feedback = Fibonacci.Feedback(sequence=[0, 1])
 
         # Start executing the action
         for i in range(1, goal_handle.request.order):
-            # If goal is flagged as no longer active (ie. another goal was accepted),
-            # then stop executing
+            # If goal is flagged as no longer active (ie. another goal
+            # was accepted), then stop executing
             if not goal_handle.is_active:
                 return Fibonacci.Result()
 
