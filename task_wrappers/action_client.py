@@ -56,7 +56,7 @@ class ClientGoalHandle(object):
 
         self._goal_handle  = goal_handle
         self._result       = None
-        self._result_cond  = threading.Condition()
+        self._cond  = threading.Condition()
         self._target_stage = None
 
     @property
@@ -116,22 +116,21 @@ class ClientGoalHandle(object):
           ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
-            raise ValueError()
+            raise ValueError('non-positive timeout value[%fsec]' % timeout_sec)
 
         self._target_stage = target_stage
 
         def _result_cb(future):
-            with self._result_cond:
+            with self._cond:
                 self._result = (future.result().status, future.result().result)
-                self._result_cond.notify_all()
+                self._cond.notify_all()
 
         if not self._result:
             self._goal_handle.get_result_async().add_done_callback(_result_cb)
-            with self._result_cond:
-                if not self._result_cond.wait_for(lambda:
-                                                  self._result is not None or \
-                                                  self._target_stage == '',
-                                                  timeout_sec):
+            with self._cond:
+                if not self._cond.wait_for(lambda: self._result is not None or\
+                                                   self._target_stage == '',
+                                           timeout_sec):
                     return (None, None)
         return self._result if self._result else (self.status, None)
 
@@ -142,18 +141,18 @@ class ClientGoalHandle(object):
         def _cancel_response_cb(future):
             cancel_response = future.result()
             if cancel_response.return_code != CancelGoal.Response.ERROR_NONE:
-                with self._result_cond:
+                with self._cond:
                     self._result = (self.status, None)
-                    self._result_cond.notify_all()
+                    self._cond.notify_all()
 
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
 
-    def _reached_stage(self, current_stage):
+    def _check_if_stage_reached(self, current_stage):
         if current_stage == self._target_stage:
-            with self._result_cond:
+            with self._cond:
                 self._target_stage = ''
-                self._target_stage_cond.notifyAll()
+                self._cond.notifyAll()
 
 #*********************************************************************
 #  class ActionClient                                                *
@@ -244,7 +243,8 @@ class ActionClient(object):
           TimeoutError: on a timeout.
         """
         if goal_handle_timeout_sec and goal_handle_timeout_sec <= 0.0:
-            raise ValueError()
+            raise ValueError('non-positive goal_handle timeout value[%fsec]'
+                             % goal_handle_timeout_sec)
 
         goal_handle      = None
         goal_handle_cond = threading.Condition()
@@ -263,14 +263,18 @@ class ActionClient(object):
                                              goal_handle_timeout_sec):
                 self.logger.error('timeout[%fsec] has expired'
                                   % goal_handle_timeout_sec)
-                raise TimeoutError()
+                raise TimeoutError('ActionClient.send_goal()')
             elif not goal_handle.accepted:
                 self.logger.error('goal REJECTED')
                 return
             return goal_handle
 
     def stage_feedback_cb(self, feedback):
-        feedback.goal_handle._reached_stage(feedback.feedback.current_stage)
+        # Dirty hack accessing private member of
+        # rclpy.action.client.ActionClient! I believe goal_handle should be
+        # directly accesible from feedback message.
+        goal_handle = self._client._goal_handles[bytes(feedback.goal_id.uuid)]
+        goal_handle._check_if_stage_reached(feedback.feedback.stage)
 
 #*********************************************************************
 #  class SimpleActionClient                                          *
@@ -370,7 +374,7 @@ class SimpleActionClient(ActionClient):
           ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
-            raise ValueError()
+            raise ValueError('non-positive timeout value[%ssec]' % timeout_sec)
         if not self._goal_handle:
             self.logger.error('no goals awaited')
             return GoalStatus.STATUS_UNKNOWN, None
@@ -488,7 +492,7 @@ class GroupedSimpleActionClient(ActionClient):
           ValueError: if `timeout_sec` is zero or negative.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
-            raise ValueError()
+            raise ValueError('non-positive timeout value[%fsec]' % timeout_sec)
         goal_handle = self._goal_handles.get(group)
         if not goal_handle:
             self.logger.error('no goals awaited')
