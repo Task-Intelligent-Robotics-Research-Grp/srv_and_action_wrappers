@@ -34,6 +34,7 @@
 import rclpy.action.client, threading
 from action_msgs.msg            import GoalStatus
 from action_msgs.srv            import CancelGoal
+from weakref                    import WeakValueDictionary
 
 from typing                     import Optional
 from rclpy.node                 import Node
@@ -56,7 +57,7 @@ class ClientGoalHandle(object):
 
         self._goal_handle  = goal_handle
         self._result       = None
-        self._result_cond  = threading.Condition()
+        self._cond  = threading.Condition()
         self._target_stage = None
 
     @property
@@ -121,17 +122,16 @@ class ClientGoalHandle(object):
         self._target_stage = target_stage
 
         def _result_cb(future):
-            with self._result_cond:
+            with self._cond:
                 self._result = (future.result().status, future.result().result)
-                self._result_cond.notify_all()
+                self._cond.notify_all()
 
         if not self._result:
             self._goal_handle.get_result_async().add_done_callback(_result_cb)
-            with self._result_cond:
-                if not self._result_cond.wait_for(lambda:
-                                                  self._result is not None or \
-                                                  self._target_stage == '',
-                                                  timeout_sec):
+            with self._cond:
+                if not self._cond.wait_for(lambda: self._result or \
+                                                   self._target_stage == '',
+                                           timeout_sec):
                     return (None, None)
         return self._result if self._result else (self.status, None)
 
@@ -142,16 +142,16 @@ class ClientGoalHandle(object):
         def _cancel_response_cb(future):
             cancel_response = future.result()
             if cancel_response.return_code != CancelGoal.Response.ERROR_NONE:
-                with self._result_cond:
+                with self._cond:
                     self._result = (self.status, None)
-                    self._result_cond.notify_all()
+                    self._cond.notify_all()
 
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
 
-    def _reached_stage(self, current_stage):
-        if current_stage == self._target_stage:
-            with self._result_cond:
+    def _check_if_stage_reached(self, stage):
+        if stage == self._target_stage:
+            with self._cond:
                 self._target_stage = ''
                 self._target_stage_cond.notifyAll()
 
@@ -185,9 +185,10 @@ class ActionClient(object):
         """
         super().__init__()
 
-        self._client = rclpy.action.client.ActionClient(
-                           node, action_type, action_name,
-                           callback_group=callback_group)
+        self._goal_handles = WeakValueDictionary()
+        self._client       = rclpy.action.client.ActionClient(
+                                 node, action_type, action_name,
+                                 callback_group=callback_group)
 
         self.logger.info('action client[%s] started' % action_name)
 
@@ -267,10 +268,13 @@ class ActionClient(object):
             elif not goal_handle.accepted:
                 self.logger.error('goal REJECTED')
                 return
+            self._goal_handles[bytes(goal_handle.goal_id.uuid)] = goal_handle
             return goal_handle
 
     def stage_feedback_cb(self, feedback):
-        feedback.goal_handle._reached_stage(feedback.feedback.current_stage)
+        goal_handle = self._goal_handles.get(bytes(feedback.goal_id.uuid))
+        if goal_handle:
+            goal_handle._check_if_stage_reached(feedback.feedback.stage)
 
 #*********************************************************************
 #  class SimpleActionClient                                          *
