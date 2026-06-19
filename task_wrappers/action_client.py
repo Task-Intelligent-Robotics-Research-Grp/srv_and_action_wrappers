@@ -34,6 +34,7 @@
 import rclpy.action.client, threading
 from action_msgs.msg            import GoalStatus
 from action_msgs.srv            import CancelGoal
+from weakref                    import WeakValueDictionary
 
 from typing                     import Optional
 from rclpy.node                 import Node
@@ -128,7 +129,11 @@ class ClientGoalHandle(object):
         if not self._result:
             self._goal_handle.get_result_async().add_done_callback(_result_cb)
             with self._cond:
+<<<<<<< HEAD
                 if not self._cond.wait_for(lambda: self._result is not None or\
+=======
+                if not self._cond.wait_for(lambda: self._result or \
+>>>>>>> 49ce5234785d5b56aff0b078b07f426bba74cd69
                                                    self._target_stage == '',
                                            timeout_sec):
                     return (None, None)
@@ -148,8 +153,13 @@ class ClientGoalHandle(object):
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
 
+<<<<<<< HEAD
     def _check_if_stage_reached(self, current_stage):
         if current_stage == self._target_stage:
+=======
+    def _check_if_stage_reached(self, stage):
+        if stage == self._target_stage:
+>>>>>>> 49ce5234785d5b56aff0b078b07f426bba74cd69
             with self._cond:
                 self._target_stage = ''
                 self._cond.notifyAll()
@@ -184,9 +194,10 @@ class ActionClient(object):
         """
         super().__init__()
 
-        self._client = rclpy.action.client.ActionClient(
-                           node, action_type, action_name,
-                           callback_group=callback_group)
+        self._goal_handles = WeakValueDictionary()
+        self._client       = rclpy.action.client.ActionClient(
+                                 node, action_type, action_name,
+                                 callback_group=callback_group)
 
         self.logger.info('action client[%s] started' % action_name)
 
@@ -267,14 +278,21 @@ class ActionClient(object):
             elif not goal_handle.accepted:
                 self.logger.error('goal REJECTED')
                 return
+            self._goal_handles[bytes(goal_handle.goal_id.uuid)] = goal_handle
             return goal_handle
 
     def stage_feedback_cb(self, feedback):
+<<<<<<< HEAD
         # Dirty hack accessing private member of
         # rclpy.action.client.ActionClient! I believe goal_handle should be
         # directly accesible from feedback message.
         goal_handle = self._client._goal_handles[bytes(feedback.goal_id.uuid)]
         goal_handle._check_if_stage_reached(feedback.feedback.stage)
+=======
+        goal_handle = self._goal_handles.get(bytes(feedback.goal_id.uuid))
+        if goal_handle:
+            goal_handle._check_if_stage_reached(feedback.feedback.stage)
+>>>>>>> 49ce5234785d5b56aff0b078b07f426bba74cd69
 
 #*********************************************************************
 #  class SimpleActionClient                                          *
