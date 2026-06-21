@@ -129,6 +129,11 @@ class ActionServer(object):
             super().__init__()
             self.stage = stage
 
+    class _Error(Exception):
+        def __init__(self, text, **kwargs):
+            super().__init__(text)
+            self.kwargs = kwargs
+
     def __init__(self, node: Node, action_type, action_name: str,
                  execute_callback, *,
                  callback_group: Optional[CallbackGroup]=None,
@@ -196,7 +201,7 @@ class ActionServer(object):
         self._server = rclpy.action.server.ActionServer(
                            node, action_type, action_name,
                            callback_group=callback_group,
-                           execute_callback=self._execute_cb,
+                           execute_callback=self._base_execute_cb,
                            goal_callback=goal_callback,
                            handle_accepted_callback=self._handle_accepted_cb,
                            cancel_callback=self._cancel_cb)
@@ -241,7 +246,7 @@ class ActionServer(object):
                          % ActionServer.goal_id_str(goal_handle))
         return CancelResponse.ACCEPT
 
-    def _execute_cb(self, goal_handle):
+    def _base_execute_cb(self, goal_handle):
         self.logger.info('goal[%s] started'
                          % ActionServer.goal_id_str(goal_handle))
         try:
@@ -259,13 +264,17 @@ class ActionServer(object):
                                     preempted.stage))
             return self.action_type.Result(stage=preempted.stage)
 
-        except TimeoutError as err:
+        except self._Error as err:
+            self.logger.error('%s' % err)
             goal_handle.abort()
-            self.logger.error(err)
+            return self.action_type.Result(**err.kwargs)
+
+        except TimeoutError as err:
+            self.logger.error('%s' % err)
+            goal_handle.abort()
             return self.action_type.Result()
 
         finally:
-            self._goal_handles.remove(goal_handle)
             if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:
                 self.logger.info('goal[%s] SUCCEEDED'
                                  % ActionServer.goal_id_str(goal_handle))
@@ -279,3 +288,4 @@ class ActionServer(object):
                 self.logger.error('goal[%s] terminated with status[%d]'
                                   % (ActionServer.goal_id_str(goal_handle),
                                      goal_handle.status))
+            self._goal_handles.remove(goal_handle)
