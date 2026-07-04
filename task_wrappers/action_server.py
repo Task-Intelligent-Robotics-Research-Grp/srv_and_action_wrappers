@@ -228,7 +228,7 @@ class ActionServer(object):
 
     def enter_stage(self, goal_handle, next_stage, current_stage=''):
         if goal_handle.is_cancel_requested or not goal_handle.is_active:
-            raise self._Preemted(current_stage)
+            raise self._Preempted(current_stage)
         self.logger.info('stage transition: "%s" => "%s"'
                          % (current_stage, next_stage))
         goal_handle.publish_feedback(
