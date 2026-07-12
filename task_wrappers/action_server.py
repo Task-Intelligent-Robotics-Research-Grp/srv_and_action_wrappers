@@ -195,7 +195,7 @@ class ActionServer(object):
         else:
             raise ValueError()
 
-        self._user_execute_cb = execute_callback
+        self._execute_cb = execute_callback
         if not goal_callback:
             goal_callback = self._default_goal_cb
         self._server = rclpy.action.server.ActionServer(
@@ -226,13 +226,17 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
-    def enter_stage(self, goal_handle, next_stage, current_stage=''):
-        if goal_handle.is_cancel_requested or not goal_handle.is_active:
-            raise self._Preempted(current_stage)
+    def enter_stage(self, goal_handle, stage, previous_stage=''):
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+            raise ActionServer._Preempted(previous_stage)
+        elif not goal_handle.is_active:
+            raise ActionServer._Preempted(previous_stage)
         self.logger.info('stage transition: "%s" => "%s"'
-                         % (current_stage, next_stage))
+                         % (previous_stage, stage))
         goal_handle.publish_feedback(
-            self.action_type.Feedback(stage=next_stage))
+            self.action_type.Feedback(stage=stage))
+        return stage
 
     def _default_goal_cb(self, goal_request):
         self.logger.info('new goal ACCEPTED')
@@ -250,21 +254,13 @@ class ActionServer(object):
         self.logger.info('goal[%s] started'
                          % ActionServer.goal_id_str(goal_handle))
         try:
-            return self._user_execute_cb(goal_handle)
+            return self._execute_cb(goal_handle)
 
-        except self._Preempted as preempted:
-            if goal_handle.is_cancel_requested:
-                self.logger.warn('goal[%s] preempted at stage[%s] by cancel request from the client'
-                                 % (ActionServer.goal_id_str(goal_handle),
-                                    preempted.stage))
-                goal_handle.canceled()
-            else:
-                self.logger.warn('goal[%s] preempted at stage[%s] by another goal'
-                                 % (ActionServer.goal_id_str(goal_handle),
-                                    preempted.stage))
+        except ActionServer._Preempted as preempted:
+            self.logger.warn('preempted at stage[%s]' % preempted.stage)
             return self.action_type.Result(stage=preempted.stage)
 
-        except self._Error as err:
+        except ActionServer._Error as err:
             self.logger.error('%s' % err)
             goal_handle.abort()
             return self.action_type.Result(**err.kwargs)
