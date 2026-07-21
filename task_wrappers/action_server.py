@@ -260,13 +260,13 @@ class ActionServer(object):
             self.logger.warn('preempted at stage[%s]' % preempted.stage)
             return self.action_type.Result(stage=preempted.stage)
 
-        except ActionServer._Error as err:
-            self.logger.error('%s' % err)
+        except ActionServer._Error as error:
+            self.logger.error('%s' % error)
             goal_handle.abort()
-            return self.action_type.Result(**err.kwargs)
+            return self.action_type.Result(**error.kwargs)
 
-        except TimeoutError as err:
-            self.logger.error('%s' % err)
+        except TimeoutError as error:
+            self.logger.error('%s' % error)
             goal_handle.abort()
             return self.action_type.Result()
 
