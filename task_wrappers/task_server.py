@@ -40,22 +40,143 @@ from rclpy.node            import Node
 from rclpy.callback_groups import CallbackGroup
 from rclpy.action.server   import ServerGoalHandle
 from typing                import Optional, Union
-from .action_server        import ActionServer
 
 #************************************************************************
-#  class TaskServer                                                     *
+#  stuffs concerning with ServerGoalHandle                              *
 #************************************************************************
-class TaskServer(ActionServer):
+class ServerGoalHandleBuffer(object):
+    """ Buffer storing a single ``ServerGoalHandle``.
+    """
+    def __init__(self):
+        super().__init__()
+        self._lock        = threading.Lock()
+        self._goal_handle = None
+
+    def append(self, goal_handle: ServerGoalHandle):
+        with self._lock:
+            if self._goal_handle is not None:
+                self._goal_handle.abort()
+            self._goal_handle = goal_handle
+        goal_handle.execute()
+
+    def remove(self, goal_handle: ServerGoalHandle):
+        with self._lock:
+            self._goal_handle = None
+
+class ServerGoalHandleQueue(object):
+    """ FIFO queue storing ``ServerGoalHandle``.
+    """
+    def __init__(self):
+        super().__init__()
+        self._lock  = threading.Lock()
+        self._deque = deque()
+
+    def append(self, goal_handle: ServerGoalHandle):
+        with self._lock:
+            if len(self._deque) == 0:
+                goal_handle.execute()
+            self._deque.append(goal_handle)
+
+    def remove(self, goal_handle: ServerGoalHandle):
+        with self._lock:
+            self._deque.remove(goal_handle)
+            if len(self._deque) > 0:
+                self._deque[0].execute()
+
+class ServerGoalHandlePassthrough(object):
+    """ Dummy buffer storing no ``ServerGoalHandle``.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def append(self, goal_handle: ServerGoalHandle):
+        goal_handle.execute()
+
+    def remove(self, goal_handle: ServerGoalHandle):
+        pass
+
+class ServerGoalHandlesDict(object):
+    """ Dictionary of containers of ``ServerGoalHandle`` with string keys.
+    """
+    def __init__(self,
+                 buffer_type: Union[ServerGoalHandleBuffer,
+                                    ServerGoalHandleQueue],
+                 group_field: str):
+        super().__init__()
+        self._buffer_type = buffer_type
+        self._group_field = group_field
+        self._dict        = {}
+
+    def append(self, goal_handle: ServerGoalHandle) -> None:
+        group = getattr(goal_handle.request, self._group_field)
+        if not group in self._dict:
+            self._dict[group] = self._buffer_type()
+        self._dict[group].append(goal_handle)
+
+    def remove(self, goal_handle: ServerGoalHandle) -> None:
+        group = getattr(goal_handle.request, self._group_field)
+        self._dict[group].remove(goal_handle)
+
+#************************************************************************
+#  class ActionServer                                                   *
+#************************************************************************
+class ActionServer(object):
     """ ROS Action server supporting multiple policies of processing goals.
     This class wraps ``rclpy.action.server.ActionServer``.
     """
+    T = TypeVar('T')
+
+    class Stage(object):
+        def __init__(name, node, execute_stage, *, cancel_stage=None):
+            super().__init__()
+            self._name          = name
+            self._node          = node
+            self._execute_stage = execute_stage
+            self._cancel_stage  = cancel_stage
+            self._error_handler = None
+
+        def register_error_handler(self, error_handler):
+            self._error_handler = error_handler
+
+        def execute(self, goal_handle, **kwargs):
+            self._node.logger.info('enter stage: "%s"' % self._name)
+
+            # Feedback current stage name to the task client.
+            goal_handle.publish_feedback(
+                self.action_type.Feedback(stage=self._name))
+
+            stage_result = self._execute_stage(goal_handle.request, **kwargs)
+            if status == GoalStatus.STATUS_ABORTED:
+
+
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                raise ActionServer._Preempted(stage)
+            elif not goal_handle.is_active:
+                raise ActionServer._Preempted(stage)
+
+
+        def cancel(self):
+            if self._cancel_stage is not None:
+                self._cancel_stage()
+
+    class _Preempted(Exception):
+        def __init__(self, stage):
+            super().__init__()
+            self.stage = stage
+
+    class _Error(Exception):
+        def __init__(self, text, **kwargs):
+            super().__init__(text)
+            self.kwargs = kwargs
+
     def __init__(self, node: Node, action_type, action_name: str,
                  execute_callback, *,
                  callback_group: Optional[CallbackGroup]=None,
                  goal_callback=None,
                  goal_processing_policy: str='single',
                  group_field: str=''):
-        """ Create an TaskServer.
+        """ Create an ActionServer.
 
         Args:
           node: The ROS node to add the action server to.
@@ -89,22 +210,131 @@ class TaskServer(ActionServer):
               according to the policy specified by ``goal_processing_policy``.
             * If empty string, grouping is disabled.
         """
-        super().__init__(node, action_type, action_name, execute_callback,
-                         callback_group=callback_group,
-                         goal_callback=goal_callback,
-                         goal_processing_policy=goal_processing_policy,
-                         group_field=group_field)
+        super().__init__()
 
-    def check_goal_status(self, goal_handle, **results):
+        # Server settings
+        if goal_processing_policy == 'single':
+            if group_field != '':
+                self._goal_handles \
+                    = ServerGoalHandlesDict(ServerGoalHandleBuffer,
+                                            group_field)
+            else:
+                self._goal_handles = ServerGoalHandleBuffer()
+        elif goal_processing_policy == 'queued':
+            if group_field != '':
+                self._goal_handles \
+                    = ServerGoalHandlesDict(ServerGoalHandleQueue, group_field)
+            else:
+                self._goal_handles = ServerGoalHandleQueue()
+        elif goal_processing_policy == 'multi':
+            self._goal_handles = ServerGoalHandlePassthrough()
+        else:
+            raise ValueError('unknown goal proccessing policy[%s]'
+                             % goal_processing_policy)
+
+        self._stage_funcs = {}
+        self._error_recovery_funcs = {}
+
+        self._execute_cb = execute_callback
+        if not goal_callback:
+            goal_callback = self._default_goal_cb
+        self._server = rclpy.action.server.ActionServer(
+                           node, action_type, action_name,
+                           callback_group=callback_group,
+                           execute_callback=self._base_execute_cb,
+                           goal_callback=goal_callback,
+                           handle_accepted_callback=self._handle_accepted_cb,
+                           cancel_callback=self._cancel_cb)
+        self.logger.info('action server[%s] started' % action_name)
+
+    @property
+    def action_type(self):
+        return self._server.action_type
+
+    @property
+    def node(self):
+        return self._server._node
+
+    @property
+    def logger(self):
+        return self.node.get_logger()
+
+    @staticmethod
+    def goal_id_str(goal_handle):
+        s = '0x'
+        for i in goal_handle.goal_id.uuid:
+            s += format(i, '02x')
+        return s
+
+    def add_stage(self, stage_name, stage_func, ):
+        self._stage_funcs[stage] = stage_func
+        self._error_recovery_funcs[stage] \
+            = self._default_error_recovery_func
+
+    def register_error_recovery_func(self, stage, error_recovery_func):
+        self._error_recovery_funcs[stage] = error_recovery_func
+
+    def execute_stage(self, stage, goal_handle, **kwargs):
+        self.logger.info('enter stage: "%s"' % stage)
+
+        # Feedback current stage name to the task client.
+        goal_handle.publish_feedback(
+            self.action_type.Feedback(stage=stage))
+
+        stage_result = self._stage_funcs[stage](goal_handle.request, **kwargs)
+
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
-            raise ActionServer._Preempted(**results)
+            raise ActionServer._Preempted(stage)
         elif not goal_handle.is_active:
-            raise ActionServer._Preempted(**results)
+            raise ActionServer._Preempted(stage)
 
-    def check_stage_result(self,
+    def _default_goal_cb(self, goal_request):
+        self.logger.info('new goal ACCEPTED')
+        return GoalResponse.ACCEPT
+
+    def _handle_accepted_cb(self, goal_handle):
+        self._goal_handles.append(goal_handle)
 
     def _cancel_cb(self, goal_handle):
         self.logger.warn('cancel requested for goal[%s]'
                          % ActionServer.goal_id_str(goal_handle))
+        for active_stage_goal_handle in self._active_stage_goal_handles:
+            active_stage_goal_handle.cancel_goal()
         return CancelResponse.ACCEPT
+
+    def _base_execute_cb(self, goal_handle):
+        self.logger.info('goal[%s] started'
+                         % ActionServer.goal_id_str(goal_handle))
+        try:
+            return self._execute_cb(goal_handle)
+
+        except ActionServer._Preempted as preempted:
+            self.logger.warn('preempted at stage[%s]' % preempted.stage)
+            return self.action_type.Result(stage=preempted.stage)
+
+        except ActionServer._Error as error:
+            self.logger.error('%s' % error)
+            goal_handle.abort()
+            return self.action_type.Result(**error.kwargs)
+
+        except TimeoutError as error:
+            self.logger.error('%s' % error)
+            goal_handle.abort()
+            return self.action_type.Result()
+
+        finally:
+            if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:
+                self.logger.info('goal[%s] SUCCEEDED'
+                                 % ActionServer.goal_id_str(goal_handle))
+            elif goal_handle.status == GoalStatus.STATUS_CANCELED:
+                self.logger.warn('goal[%s] CANCELED'
+                                 % ActionServer.goal_id_str(goal_handle))
+            elif goal_handle.status == GoalStatus.STATUS_ABORTED:
+                self.logger.error('goal[%s] ABORTED'
+                                  % ActionServer.goal_id_str(goal_handle))
+            else:
+                self.logger.error('goal[%s] terminated with status[%d]'
+                                  % (ActionServer.goal_id_str(goal_handle),
+                                     goal_handle.status))
+            self._goal_handles.remove(goal_handle)
