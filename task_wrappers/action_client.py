@@ -149,7 +149,7 @@ class ClientGoalHandle(object):
         self._goal_handle.cancel_goal_async() \
                          .add_done_callback(_cancel_response_cb)
 
-    def _check_if_stage_reached(self, stage):
+    def check_if_stage_reached(self, stage):
         if stage == self._target_stage:
             with self._cond:
                 self._target_stage = ''
@@ -275,7 +275,7 @@ class ActionClient(object):
     def stage_feedback_cb(self, feedback):
         goal_handle = self._goal_handles.get(bytes(feedback.goal_id.uuid))
         if goal_handle:
-            goal_handle._check_if_stage_reached(feedback.feedback.stage)
+            goal_handle.check_if_stage_reached(feedback.feedback.stage)
 
 #*********************************************************************
 #  class SimpleActionClient                                          *
