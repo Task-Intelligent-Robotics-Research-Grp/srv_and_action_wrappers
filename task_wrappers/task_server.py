@@ -124,6 +124,42 @@ class ActionServer(object):
     """ ROS Action server supporting multiple policies of processing goals.
     This class wraps ``rclpy.action.server.ActionServer``.
     """
+    T = TypeVar('T')
+
+    class Stage(object):
+        def __init__(name, node, execute_stage, *, cancel_stage=None):
+            super().__init__()
+            self._name          = name
+            self._node          = node
+            self._execute_stage = execute_stage
+            self._cancel_stage  = cancel_stage
+            self._error_handler = None
+
+        def register_error_handler(self, error_handler):
+            self._error_handler = error_handler
+
+        def execute(self, goal_handle, **kwargs):
+            self._node.logger.info('enter stage: "%s"' % self._name)
+
+            # Feedback current stage name to the task client.
+            goal_handle.publish_feedback(
+                self.action_type.Feedback(stage=self._name))
+
+            stage_result = self._execute_stage(goal_handle.request, **kwargs)
+            if status == GoalStatus.STATUS_ABORTED:
+
+
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                raise ActionServer._Preempted(stage)
+            elif not goal_handle.is_active:
+                raise ActionServer._Preempted(stage)
+
+
+        def cancel(self):
+            if self._cancel_stage is not None:
+                self._cancel_stage()
+
     class _Preempted(Exception):
         def __init__(self, stage):
             super().__init__()
@@ -193,7 +229,11 @@ class ActionServer(object):
         elif goal_processing_policy == 'multi':
             self._goal_handles = ServerGoalHandlePassthrough()
         else:
-            raise ValueError()
+            raise ValueError('unknown goal proccessing policy[%s]'
+                             % goal_processing_policy)
+
+        self._stage_funcs = {}
+        self._error_recovery_funcs = {}
 
         self._execute_cb = execute_callback
         if not goal_callback:
@@ -226,17 +266,28 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
-    def enter_stage(self, goal_handle, stage, previous_stage=''):
-        if goal_handle.is_cancel_requested:
-            goal_handle.canceled()
-            raise ActionServer._Preempted(previous_stage)
-        elif not goal_handle.is_active:
-            raise ActionServer._Preempted(previous_stage)
-        self.logger.info('stage transition: "%s" => "%s"'
-                         % (previous_stage, stage))
+    def add_stage(self, stage_name, stage_func, ):
+        self._stage_funcs[stage] = stage_func
+        self._error_recovery_funcs[stage] \
+            = self._default_error_recovery_func
+
+    def register_error_recovery_func(self, stage, error_recovery_func):
+        self._error_recovery_funcs[stage] = error_recovery_func
+
+    def execute_stage(self, stage, goal_handle, **kwargs):
+        self.logger.info('enter stage: "%s"' % stage)
+
+        # Feedback current stage name to the task client.
         goal_handle.publish_feedback(
             self.action_type.Feedback(stage=stage))
-        return stage
+
+        stage_result = self._stage_funcs[stage](goal_handle.request, **kwargs)
+
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+            raise ActionServer._Preempted(stage)
+        elif not goal_handle.is_active:
+            raise ActionServer._Preempted(stage)
 
     def _default_goal_cb(self, goal_request):
         self.logger.info('new goal ACCEPTED')
@@ -248,6 +299,8 @@ class ActionServer(object):
     def _cancel_cb(self, goal_handle):
         self.logger.warn('cancel requested for goal[%s]'
                          % ActionServer.goal_id_str(goal_handle))
+        for active_stage_goal_handle in self._active_stage_goal_handles:
+            active_stage_goal_handle.cancel_goal()
         return CancelResponse.ACCEPT
 
     def _base_execute_cb(self, goal_handle):
