@@ -125,9 +125,9 @@ class ActionServer(object):
     This class wraps ``rclpy.action.server.ActionServer``.
     """
     class _Preempted(Exception):
-        def __init__(self, stage):
-            super().__init__()
-            self.stage = stage
+        def __init__(self, text, **kwargs):
+            super().__init__(text)
+            self.kwargs = kwargs
 
     class _Error(Exception):
         def __init__(self, text, **kwargs):
@@ -226,16 +226,20 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
-    def enter_stage(self, goal_handle, stage, previous_stage=''):
+    def enter_stage(self, goal_handle, stage, previous_stage, **kwargs):
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
-            raise ActionServer._Preempted(previous_stage)
+            raise ActionServer._Preempted('cancel requested at stage[%s]'
+                                          % previous_stage,
+                                          stage=previous_stage)
         elif not goal_handle.is_active:
-            raise ActionServer._Preempted(previous_stage)
+            raise ActionServer._Preempted('aborted at stage[%s]'
+                                          % previous_stage,
+                                          stage=previous_stage)
         self.logger.info('stage transition: "%s" => "%s"'
                          % (previous_stage, stage))
         goal_handle.publish_feedback(
-            self.action_type.Feedback(stage=stage))
+            self.action_type.Feedback(stage=stage, **kwargs))
         return stage
 
     def _default_goal_cb(self, goal_request):
@@ -257,8 +261,8 @@ class ActionServer(object):
             return self._execute_cb(goal_handle)
 
         except ActionServer._Preempted as preempted:
-            self.logger.warn('preempted at stage[%s]' % preempted.stage)
-            return self.action_type.Result(stage=preempted.stage)
+            self.logger.warn('%s' % preempted)
+            return self.action_type.Result(**preempted.kwargs)
 
         except ActionServer._Error as error:
             self.logger.error('%s' % error)
