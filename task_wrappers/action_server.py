@@ -124,12 +124,43 @@ class ActionServer(object):
     """ ROS Action server supporting multiple policies of processing goals.
     This class wraps ``rclpy.action.server.ActionServer``.
     """
-    class _Preempted(Exception):
-        def __init__(self, stage):
+    class Stage(object):
+        def __init__(self, server, goal_handle, name, cancel_func=None):
             super().__init__()
-            self.stage = stage
+            self._server      = server
+            self._goal_handle = goal_handle
+            self._name        = name
+            self._cancel_func = cancel_func
+            server._current_stages[bytes(goal_handle.goal_id.uuid)] = self
 
-    class _Error(Exception):
+        @property
+        def name(self):
+            return self._name
+
+        def __enter__(self):
+            self._server.logger.info('--- entered stage[%s] ---' % self.name)
+            self._goal_handle.publish_feedback(
+                self._server.action_type.Feedback(stage=self.name))
+            return self
+
+        def __exit__(self, ex_type, ex_val, ex_tb):
+            del self._server._current_stages[
+                bytes(self._goal_handle.goal_id.uuid)]
+            ActionServer.check_goal_status(
+                self._goal_handle, 'preempted at stage[%s]' % self.name,
+                stage=self.name)
+            return False
+
+        def cancel(self):
+            if self._cancel_func:
+                self._cancel_func()
+
+    class _Preempted(Exception):
+        def __init__(self, text, **kwargs):
+            super().__init__(text)
+            self.kwargs = kwargs
+
+    class Error(Exception):
         def __init__(self, text, **kwargs):
             super().__init__(text)
             self.kwargs = kwargs
@@ -205,6 +236,8 @@ class ActionServer(object):
                            goal_callback=goal_callback,
                            handle_accepted_callback=self._handle_accepted_cb,
                            cancel_callback=self._cancel_cb)
+
+        self._current_stages = {}
         self.logger.info('action server[%s] started' % action_name)
 
     @property
@@ -226,17 +259,13 @@ class ActionServer(object):
             s += format(i, '02x')
         return s
 
-    def enter_stage(self, goal_handle, stage, previous_stage=''):
+    @staticmethod
+    def check_goal_status(goal_handle, text, **kwargs):
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
-            raise ActionServer._Preempted(previous_stage)
+            raise ActionServer._Preempted(text, **kwargs)
         elif not goal_handle.is_active:
-            raise ActionServer._Preempted(previous_stage)
-        self.logger.info('stage transition: "%s" => "%s"'
-                         % (previous_stage, stage))
-        goal_handle.publish_feedback(
-            self.action_type.Feedback(stage=stage))
-        return stage
+            raise ActionServer._Preempted(text, **kwargs)
 
     def _default_goal_cb(self, goal_request):
         self.logger.info('new goal ACCEPTED')
@@ -248,6 +277,10 @@ class ActionServer(object):
     def _cancel_cb(self, goal_handle):
         self.logger.warn('cancel requested for goal[%s]'
                          % ActionServer.goal_id_str(goal_handle))
+        current_stage = self._current_stages.get(
+                            bytes(goal_handle.goal_id.uuid))
+        if current_stage:
+            current_stage.cancel()
         return CancelResponse.ACCEPT
 
     def _base_execute_cb(self, goal_handle):
@@ -257,10 +290,10 @@ class ActionServer(object):
             return self._execute_cb(goal_handle)
 
         except ActionServer._Preempted as preempted:
-            self.logger.warn('preempted at stage[%s]' % preempted.stage)
-            return self.action_type.Result(stage=preempted.stage)
+            self.logger.warn('%s' % preempted)
+            return self.action_type.Result(**preempted.kwargs)
 
-        except ActionServer._Error as error:
+        except ActionServer.Error as error:
             self.logger.error('%s' % error)
             goal_handle.abort()
             return self.action_type.Result(**error.kwargs)
