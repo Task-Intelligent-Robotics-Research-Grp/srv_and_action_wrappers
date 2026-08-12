@@ -36,9 +36,6 @@
 import rclpy, sys, time
 from rclpy.node                  import Node
 from rclpy.executors             import MultiThreadedExecutor
-from rclpy.callback_groups       import (MutuallyExclusiveCallbackGroup,
-                                         ReentrantCallbackGroup)
-from rclpy.action.server         import GoalResponse, CancelResponse
 from example_interfaces.action   import Fibonacci
 from task_wrappers.action_server import ActionServer
 
