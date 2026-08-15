@@ -125,12 +125,13 @@ class ActionServer(object):
     This class wraps ``rclpy.action.server.ActionServer``.
     """
     class Stage(object):
-        def __init__(self, server, goal_handle, name, cancel_func=None):
+        def __init__(self, server, goal_handle, name, cancel_handler=None):
             super().__init__()
-            self._server      = server
-            self._goal_handle = goal_handle
-            self._name        = name
-            self._cancel_func = cancel_func
+            self._server         = server
+            self._goal_handle    = goal_handle
+            self._name           = name
+            self._cancel_handler = cancel_handler
+            self._error_handler  = server._error_handlers.get(name)
             server._current_stages[bytes(goal_handle.goal_id.uuid)] = self
 
         @property
@@ -146,23 +147,31 @@ class ActionServer(object):
         def __exit__(self, ex_type, ex_val, ex_tb):
             del self._server._current_stages[
                 bytes(self._goal_handle.goal_id.uuid)]
+
+            if ex_type == ActionServer.Error and self._error_handler:
+                return self._error_handler(self._goal_handle.request,
+                                           **ex_val.kwargs)
+
             ActionServer.check_goal_status(
                 self._goal_handle, 'preempted at stage[%s]' % self.name,
                 stage=self.name)
             return False
 
+        def extend_name(self, substage_name):
+            return self.name + '/' + substage_name
+
         def cancel(self):
-            if self._cancel_func:
-                self._cancel_func()
+            if self._cancel_handler:
+                self._cancel_handler()
 
     class _Preempted(Exception):
-        def __init__(self, text, **kwargs):
-            super().__init__(text)
+        def __init__(self, message, **kwargs):
+            super().__init__(message)
             self.kwargs = kwargs
 
     class Error(Exception):
-        def __init__(self, text, **kwargs):
-            super().__init__(text)
+        def __init__(self, message, **kwargs):
+            super().__init__(message)
             self.kwargs = kwargs
 
     def __init__(self, node: Node, action_type, action_name: str,
@@ -224,7 +233,8 @@ class ActionServer(object):
         elif goal_processing_policy == 'multi':
             self._goal_handles = ServerGoalHandlePassthrough()
         else:
-            raise ValueError()
+            raise ValueError('unknown goal processing policy[%s]'
+                             % goal_processing_policy)
 
         self._execute_cb = execute_callback
         if not goal_callback:
@@ -238,6 +248,7 @@ class ActionServer(object):
                            cancel_callback=self._cancel_cb)
 
         self._current_stages = {}
+        self._error_handlers = {}
         self.logger.info('action server[%s] started' % action_name)
 
     @property
@@ -245,7 +256,7 @@ class ActionServer(object):
         return self._server.action_type
 
     @property
-    def node(self):
+    def node(self)-> Node:
         return self._server._node
 
     @property
@@ -253,19 +264,22 @@ class ActionServer(object):
         return self.node.get_logger()
 
     @staticmethod
-    def goal_id_str(goal_handle):
+    def goal_id_str(goal_handle)-> str:
         s = '0x'
         for i in goal_handle.goal_id.uuid:
             s += format(i, '02x')
         return s
 
     @staticmethod
-    def check_goal_status(goal_handle, text, **kwargs):
+    def check_goal_status(goal_handle, message, **kwargs)-> None:
         if goal_handle.is_cancel_requested:
             goal_handle.canceled()
-            raise ActionServer._Preempted(text, **kwargs)
+            raise ActionServer._Preempted(message, **kwargs)
         elif not goal_handle.is_active:
-            raise ActionServer._Preempted(text, **kwargs)
+            raise ActionServer._Preempted(message, **kwargs)
+
+    def register_error_handler(self, stage: str, error_handler)-> None:
+        self._error_handlers[stage] = error_handler
 
     def _default_goal_cb(self, goal_request):
         self.logger.info('new goal ACCEPTED')
@@ -304,13 +318,13 @@ class ActionServer(object):
             return self.action_type.Result()
 
         finally:
-            if goal_handle.status == GoalStatus.STATUS_SUCCEEDED:
+            if goal_handle.status is GoalStatus.STATUS_SUCCEEDED:
                 self.logger.info('goal[%s] SUCCEEDED'
                                  % ActionServer.goal_id_str(goal_handle))
-            elif goal_handle.status == GoalStatus.STATUS_CANCELED:
+            elif goal_handle.status is GoalStatus.STATUS_CANCELED:
                 self.logger.warn('goal[%s] CANCELED'
                                  % ActionServer.goal_id_str(goal_handle))
-            elif goal_handle.status == GoalStatus.STATUS_ABORTED:
+            elif goal_handle.status is GoalStatus.STATUS_ABORTED:
                 self.logger.error('goal[%s] ABORTED'
                                   % ActionServer.goal_id_str(goal_handle))
             else:
