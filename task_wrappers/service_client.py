@@ -131,12 +131,11 @@ class ServiceClient(object):
           TimeoutError: on a timeout.
         """
         if timeout_sec is not None and timeout_sec <= 0.0:
-            raise ValueError()
+            raise ValueError('non-positive timeout value[%fsec]' % timeout_sec)
 
         with self._response_cond:
             if not self._response_cond.wait_for(lambda:
                                                 self._response is not None,
                                                 timeout_sec):
-                self._logger.error('timeout[%fsec] has expired' % timeout_sec)
-                raise TimeoutError()
+                raise TimeoutError('timeout[%fsec] has expired' % timeout_sec)
             return self._response
