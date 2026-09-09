@@ -37,7 +37,7 @@ import rclpy, sys, time
 from rclpy.node                  import Node
 from rclpy.executors             import MultiThreadedExecutor
 from example_interfaces.action   import Fibonacci
-from task_wrappers.action_server import ActionServer
+from task_wrappers               import ActionServer
 
 class TestActionServer(Node):
     def __init__(self):
